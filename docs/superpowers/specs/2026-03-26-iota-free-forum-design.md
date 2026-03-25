@@ -72,10 +72,10 @@ All transactions use gzip compression and chain-linking for unlimited payload si
 ### Anti-Replay & ID Generation
 
 Every signed payload includes:
-- `nonce`: UUID v4 casuale generato dal client. Il server rifiuta nonce gia visti (stored in SQLite table `seen_nonces` con TTL 24h).
-- `id`: generato dal client come `<PREFIX>_<nonce_first8>` (es. `POST_a1b2c3d4`). L'ID e parte dei dati firmati, il server non puo alterarlo.
+- `nonce`: UUID v4 casuale generato dal client. Il server rifiuta nonce gia visti (stored in SQLite table `seen_nonces`, mantenuti indefinitamente — UUID a 36 byte ha costo storage trascurabile). Inoltre il server rifiuta payload con `createdAt` piu vecchio di 24h come ulteriore protezione anti-replay.
+- `id`: generato dal client come `<PREFIX>_<nonce_first8>` (es. `POST_a1b2c3d4`). L'ID e parte dei dati firmati, il server non puo alterarlo. Eccezione: `FORUM_USER` il cui id e derivato deterministicamente dalla publicKey (vedi Identity Model).
 - `version`: intero incrementale. Per edit, il client pubblica una nuova TX con lo stesso `id` e `version + 1`. La versione piu alta e canonica.
-- `signature`: RSA-SHA256 firma di `JSON.stringify(payload_senza_campo_signature)` con la chiave privata dell'autore.
+- `signature`: RSA-SHA256 firma del payload serializzato con chiavi ordinate alfabeticamente: `JSON.stringify(payload_senza_campo_signature, Object.keys(payload).sort())`. Questa canonicalizzazione garantisce che client e server producano la stessa stringa indipendentemente dall'ordine di inserimento delle chiavi.
 
 ### Username Conflict Resolution
 
@@ -129,6 +129,9 @@ Decryption flow (client-side):
 ## Data Payloads
 
 ### FORUM_USER
+
+Note: `id` (`USR_<hash16>`) non e incluso nel payload — e derivato deterministicamente come `SHA-256(publicKey).substring(0,16)` da entrambi client e server. Poiche la publicKey e nel payload firmato, l'id e implicitamente autenticato.
+
 ```json
 {
   "username": "marco_dev",
@@ -138,7 +141,7 @@ Decryption flow (client-side):
   "nonce": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "version": 1,
   "createdAt": 1774460000000,
-  "signature": "<RSA-SHA256 of payload without signature field>"
+  "signature": "<RSA-SHA256 of canonicalized payload without signature field>"
 }
 ```
 
@@ -180,12 +183,29 @@ Decryption flow (client-side):
   "vote": 1,
   "authorId": "USR_A1B2C3D4E5F6",
   "nonce": "...",
+  "version": 1,
   "createdAt": 1774460000000,
   "signature": "base64..."
 }
 ```
 
-Note: i voti sono mutabili — un utente puo cambiare voto pubblicando una nuova TX `FORUM_VOTE` con lo stesso `postId + authorId`. La versione con timestamp piu recente vince.
+Note: i voti sono mutabili — un utente puo cambiare voto pubblicando una nuova TX `FORUM_VOTE` con lo stesso `postId + authorId` e `version + 1`. La versione piu alta e canonica (consistente con il meccanismo di versioning usato per tutti gli altri tipi di TX).
+
+### FORUM_CATEGORY
+```json
+{
+  "id": "CAT_a1b2c3d4",
+  "name": "General Discussion",
+  "description": "Talk about anything",
+  "authorId": "USR_ADMIN...",
+  "nonce": "...",
+  "version": 1,
+  "createdAt": 1774460000000,
+  "signature": "base64..."
+}
+```
+
+Note: le categorie supportano versioning (edit nome/descrizione) e sono create solo da admin.
 
 ### FORUM_ROLE
 ```json
@@ -194,6 +214,7 @@ Note: i voti sono mutabili — un utente puo cambiare voto pubblicando una nuova
   "role": "moderator",
   "categoryId": "CAT_1",
   "grantedBy": "USR_ADMIN...",
+  "nonce": "...",
   "createdAt": 1774460000000,
   "signature": "base64..."
 }
@@ -206,6 +227,7 @@ Note: i voti sono mutabili — un utente puo cambiare voto pubblicando una nuova
   "action": "hide",
   "reason": "Spam",
   "moderatorId": "USR_E5F6G7H8I9J0",
+  "nonce": "...",
   "createdAt": 1774460000000,
   "signature": "base64..."
 }
@@ -387,7 +409,7 @@ CREATE TABLE posts (
   updatedAt INTEGER
 );
 
--- Anti-replay: nonce gia visti (cleanup automatico > 24h)
+-- Anti-replay: nonce gia visti (mantenuti indefinitamente, ~36 byte ciascuno)
 CREATE TABLE seen_nonces (
   nonce TEXT PRIMARY KEY,
   createdAt INTEGER
@@ -430,6 +452,22 @@ CREATE TABLE config (
   createdAt INTEGER,
   updatedAt INTEGER
 );
+
+-- Full-text search (cache-only, ricostruibile)
+CREATE VIRTUAL TABLE search_index USING fts5(
+  entityId,
+  title,
+  content,
+  content='',
+  tokenize='unicode61'
+);
+
+-- Indexes for common queries
+CREATE INDEX idx_threads_category ON threads(categoryId, lastPostAt DESC);
+CREATE INDEX idx_posts_thread ON posts(threadId, createdAt);
+CREATE INDEX idx_votes_post ON votes(postId);
+CREATE INDEX idx_roles_target ON roles(targetUserId);
+CREATE INDEX idx_moderations_post ON moderations(postId);
 ```
 
 ## API Routes
@@ -446,6 +484,7 @@ CREATE TABLE config (
 |--------|-------|-------------|
 | GET | `/api/v1/categories` | List all categories with stats |
 | POST | `/api/v1/categories` | Create category (admin only, signed) |
+| PUT | `/api/v1/categories/:id` | Edit category (admin only, signed, increments version) |
 
 ### Threads
 | Method | Route | Description |
