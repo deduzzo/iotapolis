@@ -1,4 +1,5 @@
 # IOTA Free Forum - Design Specification
+# fork of: https://github.com/deduzzo/exart26-iota
 
 ## Overview
 
@@ -64,6 +65,7 @@ Modello pseudonimo: ogni utente e identificato da un keypair RSA-2048.
 | `FORUM_ROLE` | `ROLE_<targetUserId>` | targetUserId, role, categoryId | Yes (admin) | No |
 | `FORUM_MODERATION` | `MOD_<postId>` | postId, action, reason | Yes (moderator) | No |
 | `FORUM_INDEX` | null | Global entity index | Yes (server wallet) | No |
+| `FORUM_CONFIG` | `CONFIG_<type>` | Forum configuration (theme, etc.) | Yes (admin) | No |
 
 All transactions use gzip compression and chain-linking for unlimited payload size (inherited from ExArt26).
 
@@ -209,6 +211,127 @@ Note: i voti sono mutabili — un utente puo cambiare voto pubblicando una nuova
 }
 ```
 
+### FORUM_CONFIG (Theme)
+```json
+{
+  "id": "CONFIG_theme",
+  "type": "theme",
+  "baseTheme": "neon-cyber",
+  "overrides": {
+    "accent.primary": "#ff6600",
+    "typography.fontFamily": "Space Grotesk",
+    "typography.borderRadius": "4px",
+    "effects.neonGlow": false,
+    "forumName": "My Community",
+    "logo": "<base64 or URL>"
+  },
+  "authorId": "USR_ADMIN...",
+  "nonce": "...",
+  "version": 1,
+  "createdAt": 1774460000000,
+  "signature": "base64..."
+}
+```
+
+## Theme System
+
+### Theme Architecture
+
+Ogni tema e un oggetto JSON con struttura standardizzata. 4 temi built-in sono hardcoded nel frontend come preset. L'admin ne sceglie uno come base, poi personalizza via pannello. La config custom viene salvata on-chain come `FORUM_CONFIG` con versioning (ultima versione e canonica).
+
+### Theme Object Structure
+
+```javascript
+{
+  id: "neon-cyber",
+  name: "Neon Cyber",
+  category: "dark",
+  base: {
+    background: "#0a0a1a",
+    surface: "#12122a",
+    surfaceHover: "#1a1a3a",
+    border: "#2a2a4a",
+    text: "#e0e0ff",
+    textMuted: "#8888aa",
+  },
+  accent: {
+    primary: "#00f0ff",
+    secondary: "#ff00aa",
+    success: "#00ff88",
+    warning: "#ffaa00",
+    danger: "#ff4444",
+  },
+  typography: {
+    fontFamily: "Inter",
+    headingFamily: "Orbitron",
+    borderRadius: "12px",
+  },
+  effects: {
+    glassmorphism: true,
+    neonGlow: true,
+    animations: true,
+  },
+  logo: null,
+  forumName: "IOTA Free Forum",
+}
+```
+
+### Built-in Themes (4)
+
+| Theme | Style | Key Colors |
+|-------|-------|------------|
+| **Neon Cyber** (default) | Dark, glassmorphism, neon glow | Cyan `#00f0ff` + Magenta `#ff00aa` |
+| **Clean Minimal** | Light, clean, subtle shadows | Blue `#3b82f6` + Slate |
+| **Dark Pro** | Dark sober, professional | Emerald `#10b981` + Zinc |
+| **Retro Terminal** | Dark, monospace, phosphor green | Green `#00ff41` + Amber |
+
+### Admin Customization Panel (`/admin/theme`)
+
+- **Gallery** (left): card dei 4 temi con miniatura preview
+- **Customization panel** (right): color picker per colori primari, selector font (5-6 opzioni preimpostate), slider border-radius, toggle effetti, upload logo, nome forum
+- **Live preview** (bottom/split): mostra come apparira il forum in tempo reale
+- Solo utenti con ruolo `admin` possono accedere
+
+### Theme Application (Frontend)
+
+Un `ThemeProvider` React context che:
+1. Al boot, chiama `GET /api/v1/config/theme`
+2. Il server restituisce l'ultima `FORUM_CONFIG` di tipo theme (dalla cache SQLite)
+3. Il provider merge il tema base con gli overrides dell'admin
+4. Genera CSS custom properties e le inietta nel `:root`
+5. Tutti i componenti usano `var(--color-primary)` etc.
+6. Cambio tema = update CSS variables, zero reload
+
+### Available Fonts (preimpostati)
+
+Inter, Space Grotesk, JetBrains Mono, Outfit, Orbitron, IBM Plex Sans
+
+## Post/Thread Versioning & Edit History
+
+### Edit Mechanism
+
+- L'autore originale puo modificare il proprio post o thread
+- Edit = nuova TX con stesso `id` + `version + 1`, firmata dall'autore
+- La versione piu alta e canonica (mostrata di default)
+- Le versioni precedenti restano on-chain (immutabili)
+- Il server cache solo la versione corrente in SQLite, ma ricostruisce lo storico dalla chain on-demand
+
+### Edit History UI
+
+- Accanto a ogni post/thread editato: badge "modificato" con timestamp ultima modifica
+- Click sul badge apre modale con lista versioni (dalla chain)
+- Ogni versione mostra: contenuto completo, data, numero versione
+- Opzionale: diff visuale rispetto alla versione precedente
+- Endpoint: `GET /api/v1/post/:id/history` e `GET /api/v1/thread/:id/history`
+- Il server legge tutte le TX con quell'id dalla chain e le restituisce ordinate per versione decrescente
+
+### Entities with Versioning
+
+- **Posts** (`FORUM_POST`): contenuto
+- **Threads** (`FORUM_THREAD`): titolo e contenuto
+- **User profiles** (`FORUM_USER`): bio e avatar
+- **Theme config** (`FORUM_CONFIG`): configurazione tema admin
+
 ## SQLite Schema (Cache)
 
 ```sql
@@ -296,6 +419,17 @@ CREATE TABLE moderations (
   moderatorId TEXT NOT NULL,
   createdAt INTEGER
 );
+
+CREATE TABLE config (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  baseTheme TEXT,
+  overrides TEXT,
+  authorId TEXT NOT NULL,
+  version INTEGER DEFAULT 1,
+  createdAt INTEGER,
+  updatedAt INTEGER
+);
 ```
 
 ## API Routes
@@ -344,6 +478,20 @@ CREATE TABLE moderations (
 | POST | `/api/v1/moderate/thread` | Lock/pin/unpin thread (moderator, signed) |
 | POST | `/api/v1/role` | Assign role (admin, signed) |
 
+### History (Versioning)
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/api/v1/post/:id/history` | Get all versions of a post from chain |
+| GET | `/api/v1/thread/:id/history` | Get all versions of a thread from chain |
+| GET | `/api/v1/user/:id/history` | Get all versions of a user profile from chain |
+
+### Theme / Config
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/api/v1/config/theme` | Get current theme config (latest version) |
+| PUT | `/api/v1/config/theme` | Update theme config (admin only, signed, increments version) |
+| GET | `/api/v1/config/theme/history` | Get theme config version history |
+
 ### Search
 | Method | Route | Description |
 |--------|-------|-------------|
@@ -369,6 +517,7 @@ CREATE TABLE moderations (
 | User Profile | `/u/:id` | Bio, stats, recent posts |
 | Identity | `/identity` | Generate/export/import keypair, set username |
 | Admin | `/admin` | Manage categories, roles, moderation queue |
+| Theme Admin | `/admin/theme` | Theme gallery, customization panel with live preview |
 | Dashboard | `/dashboard` | Forum stats, blockchain status, sync info |
 
 ## Anti-Spam
@@ -427,12 +576,17 @@ iota-free-forum/
 │   │   ├── register.js
 │   │   ├── create-thread.js
 │   │   ├── create-post.js
+│   │   ├── edit-post.js
+│   │   ├── edit-thread.js
+│   │   ├── post-history.js
+│   │   ├── thread-history.js
 │   │   ├── vote.js
 │   │   ├── moderate.js
 │   │   ├── assign-role.js
 │   │   ├── api-categories.js
 │   │   ├── api-threads.js
 │   │   ├── api-thread-detail.js
+│   │   ├── api-config-theme.js
 │   │   ├── api-dashboard.js
 │   │   ├── api-sync-status.js
 │   │   ├── api-sync-reset.js
@@ -468,6 +622,7 @@ iota-free-forum/
 │   │   │   ├── UserProfile.jsx
 │   │   │   ├── Identity.jsx
 │   │   │   ├── Admin.jsx
+│   │   │   ├── ThemeAdmin.jsx
 │   │   │   └── Dashboard.jsx
 │   │   ├── components/     # Copied from ExArt26 + new
 │   │   │   ├── Modal.jsx
@@ -482,11 +637,14 @@ iota-free-forum/
 │   │   │   ├── MarkdownRender.jsx  # New
 │   │   │   ├── VoteButtons.jsx     # New
 │   │   │   ├── IdentityBadge.jsx   # New
-│   │   │   └── ThreadList.jsx      # New
+│   │   │   ├── ThreadList.jsx      # New
+│   │   │   ├── EditHistory.jsx    # New: version history modal
+│   │   │   └── ThemeGallery.jsx   # New: theme selection cards
 │   │   ├── hooks/          # Copied from ExArt26 + new
 │   │   │   ├── useApi.js
 │   │   │   ├── useWebSocket.js
-│   │   │   └── useIdentity.js      # New: RSA keypair management
+│   │   │   ├── useIdentity.js      # New: RSA keypair management
+│   │   │   └── useTheme.js        # New: theme context + CSS vars
 │   │   └── api/
 │   │       └── endpoints.js
 │   └── vite.config.js
