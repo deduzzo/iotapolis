@@ -2,7 +2,9 @@
 
 ## Overview
 
-Forum decentralizzato su blockchain IOTA 2.0 Rebased. I post sono immutabili e firmati crittograficamente. L'identita degli utenti e una coppia di chiavi RSA-2048 gestita nel browser (esportabile). Zero fee, zero account centralizzati, zero censura.
+Forum decentralizzato su blockchain IOTA 2.0 Rebased. I post sono immutabili e firmati crittograficamente. L'identita degli utenti e una coppia di chiavi RSA-2048 gestita nel browser (esportabile). Zero fee, zero account centralizzati.
+
+**Modello di fiducia**: il server possiede il wallet IOTA e pubblica per conto degli utenti. Questo significa che il server puo potenzialmente omettere azioni (censura per omissione) o riordinarle. Per mitigare: ogni TX pubblicata restituisce il digest IOTA al client, che puo verificarlo indipendentemente su un explorer. Il server non puo falsificare il contenuto dei post (firmati RSA dall'autore). In futuro, un client diretto che pubblica dal proprio wallet eliminerebbe completamente questo trust point.
 
 Fork architetturale di ExArt26 IOTA: riusa il layer blockchain (iota.js, CryptHelper.js, db.js, ArweaveHelper.js) con un modello dati completamente nuovo.
 
@@ -61,9 +63,24 @@ Modello pseudonimo: ogni utente e identificato da un keypair RSA-2048.
 | `FORUM_VOTE` | `VOTE_<postId>_<authorId>` | postId, vote (+1/-1) | Yes | No |
 | `FORUM_ROLE` | `ROLE_<targetUserId>` | targetUserId, role, categoryId | Yes (admin) | No |
 | `FORUM_MODERATION` | `MOD_<postId>` | postId, action, reason | Yes (moderator) | No |
-| `FORUM_INDEX` | null | Global entity index | No | No |
+| `FORUM_INDEX` | null | Global entity index | Yes (server wallet) | No |
 
 All transactions use gzip compression and chain-linking for unlimited payload size (inherited from ExArt26).
+
+### Anti-Replay & ID Generation
+
+Every signed payload includes:
+- `nonce`: UUID v4 casuale generato dal client. Il server rifiuta nonce gia visti (stored in SQLite table `seen_nonces` con TTL 24h).
+- `id`: generato dal client come `<PREFIX>_<nonce_first8>` (es. `POST_a1b2c3d4`). L'ID e parte dei dati firmati, il server non puo alterarlo.
+- `version`: intero incrementale. Per edit, il client pubblica una nuova TX con lo stesso `id` e `version + 1`. La versione piu alta e canonica.
+- `signature`: RSA-SHA256 firma di `JSON.stringify(payload_senza_campo_signature)` con la chiave privata dell'autore.
+
+### Username Conflict Resolution
+
+- Il server verifica unicita nel DB locale prima di pubblicare la TX `FORUM_USER`
+- Durante la ricostruzione da chain: se due TX `FORUM_USER` hanno lo stesso username, vince quella con timestamp on-chain piu basso (first-come-first-served)
+- Username minimo 3 caratteri, max 20, alfanumerico + underscore
+- Username riservati: admin, moderator, system, null, undefined
 
 ## Encrypted Threads
 
@@ -95,11 +112,17 @@ A thread can be marked as `encrypted: true` at creation. When encrypted:
 }
 ```
 
+Encryption per-post: ogni post genera un IV casuale di 16 byte. Il contenuto viene cifrato con AES-256-CBC usando la chiave AES del thread + IV unico. Un HMAC-SHA256 viene calcolato sul ciphertext per garantire integrita. Viene usato il metodo `CryptHelper.encryptAndSend()` gia esistente che gestisce IV + HMAC correttamente.
+
 Decryption flow (client-side):
 1. Read `keyBundle[myUserId]` from thread
 2. Decrypt AES key with own RSA private key
-3. Decrypt content with AES key
+3. For each post: decrypt with AES key + post's IV, verify HMAC
 4. Same AES key decrypts all posts in the thread
+
+**Limitazione revoca**: una volta che un utente ha decifrato la chiave AES, la possiede per sempre. Revocare l'accesso a un utente (rimuovendolo dal keyBundle) impedisce l'accesso a NUOVI post (se si rigenera la chiave AES), ma NON ai post gia letti. La revoca completa richiederebbe ri-cifrare tutto il thread con una nuova chiave, che e costoso on-chain. Questo e un compromesso accettato.
+
+**keyBundle scaling**: ogni entry nel keyBundle e ~344 bytes. Per thread con 100+ utenti autorizzati, considerare un meccanismo di group key (una chiave AES di gruppo cifrata una sola volta, distribuita separatamente).
 
 ## Data Payloads
 
@@ -110,20 +133,24 @@ Decryption flow (client-side):
   "bio": "Blockchain developer",
   "avatar": null,
   "publicKey": "-----BEGIN PUBLIC KEY-----\n...",
+  "nonce": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "version": 1,
   "createdAt": 1774460000000,
-  "signature": "<RSA signature of payload without signature field>"
+  "signature": "<RSA-SHA256 of payload without signature field>"
 }
 ```
 
 ### FORUM_THREAD
 ```json
 {
-  "id": "THR_1",
+  "id": "THR_a1b2c3d4",
   "categoryId": "CAT_1",
   "title": "First thread",
   "content": "Thread body text with **markdown** support",
   "authorId": "USR_A1B2C3D4E5F6",
   "encrypted": false,
+  "nonce": "...",
+  "version": 1,
   "createdAt": 1774460000000,
   "signature": "base64..."
 }
@@ -132,11 +159,13 @@ Decryption flow (client-side):
 ### FORUM_POST (nested reply)
 ```json
 {
-  "id": "POST_42",
-  "threadId": "THR_1",
-  "parentId": "POST_10",
+  "id": "POST_b3c4d5e6",
+  "threadId": "THR_a1b2c3d4",
+  "parentId": "POST_f7g8h9i0",
   "content": "Reply to another post",
   "authorId": "USR_A1B2C3D4E5F6",
+  "nonce": "...",
+  "version": 1,
   "createdAt": 1774460000000,
   "signature": "base64..."
 }
@@ -145,13 +174,16 @@ Decryption flow (client-side):
 ### FORUM_VOTE
 ```json
 {
-  "postId": "POST_42",
+  "postId": "POST_b3c4d5e6",
   "vote": 1,
   "authorId": "USR_A1B2C3D4E5F6",
+  "nonce": "...",
   "createdAt": 1774460000000,
   "signature": "base64..."
 }
 ```
+
+Note: i voti sono mutabili — un utente puo cambiare voto pubblicando una nuova TX `FORUM_VOTE` con lo stesso `postId + authorId`. La versione con timestamp piu recente vince.
 
 ### FORUM_ROLE
 ```json
@@ -212,9 +244,11 @@ CREATE TABLE threads (
   pinned INTEGER DEFAULT 0,
   locked INTEGER DEFAULT 0,
   hidden INTEGER DEFAULT 0,
+  version INTEGER DEFAULT 1,
   lastPostAt INTEGER,
   postCount INTEGER DEFAULT 0,
-  createdAt INTEGER
+  createdAt INTEGER,
+  updatedAt INTEGER
 );
 
 CREATE TABLE posts (
@@ -224,7 +258,15 @@ CREATE TABLE posts (
   content TEXT NOT NULL,
   authorId TEXT NOT NULL,
   hidden INTEGER DEFAULT 0,
+  version INTEGER DEFAULT 1,
   score INTEGER DEFAULT 0,
+  createdAt INTEGER,
+  updatedAt INTEGER
+);
+
+-- Anti-replay: nonce gia visti (cleanup automatico > 24h)
+CREATE TABLE seen_nonces (
+  nonce TEXT PRIMARY KEY,
   createdAt INTEGER
 );
 
@@ -278,22 +320,34 @@ CREATE TABLE moderations (
 | GET | `/api/v1/thread/:id` | Thread detail with nested posts |
 | POST | `/api/v1/threads` | Create thread (signed, optional encryption) |
 
+### Threads (continued)
+| Method | Route | Description |
+|--------|-------|-------------|
+| PUT | `/api/v1/thread/:id` | Edit thread (signed, increments version) |
+
 ### Posts
 | Method | Route | Description |
 |--------|-------|-------------|
 | POST | `/api/v1/posts` | Create post/reply (signed) |
+| PUT | `/api/v1/post/:id` | Edit post (signed, increments version) |
 | GET | `/api/v1/posts?thread=X` | Get posts for thread (with nesting) |
 
 ### Votes
 | Method | Route | Description |
 |--------|-------|-------------|
-| POST | `/api/v1/vote` | Vote on post (signed, +1 or -1) |
+| POST | `/api/v1/vote` | Vote on post (signed, +1 or -1, mutable) |
 
 ### Moderation
 | Method | Route | Description |
 |--------|-------|-------------|
-| POST | `/api/v1/moderate` | Moderate action (moderator, signed) |
+| POST | `/api/v1/moderate` | Moderate action: hide/flag post (moderator, signed) |
+| POST | `/api/v1/moderate/thread` | Lock/pin/unpin thread (moderator, signed) |
 | POST | `/api/v1/role` | Assign role (admin, signed) |
+
+### Search
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/api/v1/search?q=term` | Full-text search su thread e post (SQLite FTS5, cache-only) |
 
 ### System
 | Method | Route | Description |
@@ -324,6 +378,15 @@ CREATE TABLE moderations (
 - Admin can ban users: `FORUM_ROLE` with `role: "banned"`
 - Moderators can hide posts: `FORUM_MODERATION` with `action: "hide"`
 - Hidden posts are not deleted (immutable chain) but client hides them by default
+- Rate limiting per IP address in aggiunta a per-user-ID
+- Rate limiting su tutti gli endpoint di scrittura (non solo post)
+- Account orfani: se un utente perde la chiave, il suo username resta bloccato. Non esiste recovery. L'utente deve creare una nuova identita con un nuovo username
+
+## Configuration Notes
+
+- `APP_TAG` in `iota.js` deve essere cambiato da `exart26` a `iotaforum` per evitare collisioni on-chain
+- `FORUM_INDEX` e firmato con la chiave del wallet del server per prevenire poisoning durante il recovery
+- Il server restituisce il `digest` IOTA al client dopo ogni TX, per verifica indipendente su explorer
 
 ## Reused Components from ExArt26
 
