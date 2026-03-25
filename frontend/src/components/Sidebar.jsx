@@ -5,7 +5,7 @@ import {
   Network, ChevronLeft, ChevronRight, FileText, Bug, Globe, Zap
 } from 'lucide-react';
 
-const navItems = [
+const defaultNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', group: 'Principale' },
   { to: '/pubblico', icon: Globe, label: 'Pubblico', group: 'Principale' },
   { to: '/organizzazioni', icon: Building2, label: 'Organizzazioni', group: 'Gestione' },
@@ -18,7 +18,8 @@ const navItems = [
   { to: '/debug', icon: Bug, label: 'Debug', group: 'Sviluppo' },
 ];
 
-export default function Sidebar({ collapsed, onToggle }) {
+export default function Sidebar({ collapsed, onToggle, navItems }) {
+  navItems = navItems || defaultNavItems;
   let currentGroup = '';
 
   return (
