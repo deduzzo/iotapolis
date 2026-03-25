@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+/* Default theme variables (overridden by ThemeContext) */
+:root {
+  --color-background: #0a0a1a;
+  --color-surface: #12122a;
+  --color-surface-hover: #1a1a3a;
+  --color-border: #2a2a4a;
+  --color-text: #e0e0ff;
+  --color-text-muted: #8888aa;
+  --color-primary: #00f0ff;
+  --color-secondary: #ff00aa;
+  --color-success: #00ff88;
+  --color-warning: #ffaa00;
+  --color-danger: #ff4444;
+  --font-family: 'Inter', system-ui, sans-serif;
+  --font-heading: 'Orbitron', 'Inter', system-ui, sans-serif;
+  --border-radius: 12px;
+  --glassmorphism: 1;
+  --neon-glow: 1;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  transition: background-color 0.3s, color 0.3s;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: rgba(255, 255, 255, calc(var(--glassmorphism) * 0.05));
+  backdrop-filter: blur(calc(var(--glassmorphism) * 20px));
+  -webkit-backdrop-filter: blur(calc(var(--glassmorphism) * 20px));
+  border: 1px solid rgba(255, 255, 255, calc(var(--glassmorphism) * 0.1));
+}
+
+/* Neon glow utilities */
+.neon-text {
+  text-shadow: 0 0 calc(var(--neon-glow) * 7px) var(--color-primary),
+               0 0 calc(var(--neon-glow) * 14px) var(--color-primary);
+}
+
+.neon-border {
+  box-shadow: 0 0 calc(var(--neon-glow) * 5px) var(--color-primary),
+              inset 0 0 calc(var(--neon-glow) * 5px) rgba(0, 240, 255, 0.1);
+}
+
+.neon-border-secondary {
+  box-shadow: 0 0 calc(var(--neon-glow) * 5px) var(--color-secondary),
+              inset 0 0 calc(var(--neon-glow) * 5px) rgba(255, 0, 170, 0.1);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--border-radius);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
+}
+
+/* Glassmorphism card — static variant with padding */
+.glass-card {
+  background: rgba(255, 255, 255, calc(var(--glassmorphism) * 0.05));
+  backdrop-filter: blur(calc(var(--glassmorphism) * 20px));
+  -webkit-backdrop-filter: blur(calc(var(--glassmorphism) * 20px));
+  border: 1px solid rgba(255, 255, 255, calc(var(--glassmorphism) * 0.1));
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+}
+
+/* Glass static (no padding, used as wrapper) */
+.glass-static {
+  background: rgba(255, 255, 255, calc(var(--glassmorphism) * 0.05));
+  backdrop-filter: blur(calc(var(--glassmorphism) * 20px));
+  -webkit-backdrop-filter: blur(calc(var(--glassmorphism) * 20px));
+  border: 1px solid rgba(255, 255, 255, calc(var(--glassmorphism) * 0.1));
+}
+
+/* Primary action button */
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  color: var(--color-background);
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+/* Selection */
+::selection {
+  background-color: var(--color-primary);
+  color: var(--color-background);
+}
+
+/* Smooth transitions for theme switching */
+*, *::before, *::after {
+  transition-property: background-color, border-color, color, box-shadow, text-shadow;
+  transition-duration: 0.2s;
+  transition-timing-function: ease-out;
+}
+
+/* Override transitions for elements that should not animate */
+input, textarea, button, a {
+  transition-duration: 0.15s;
+}

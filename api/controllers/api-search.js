@@ -1,0 +1,84 @@
+const db = require('../utility/db');
+
+module.exports = {
+  friendlyName: 'API Search',
+  description: 'Full-text search on threads and posts using SQLite FTS5.',
+
+  inputs: {
+    q: { type: 'string', required: true },
+  },
+
+  exits: {
+    success: { statusCode: 200 },
+    badRequest: { statusCode: 400 },
+  },
+
+  fn: async function (inputs) {
+    try {
+      const query = inputs.q.trim();
+      if (!query || query.length < 2) {
+        this.res.status(400);
+        return { success: false, error: 'Query must be at least 2 characters' };
+      }
+
+      // Sanitize FTS5 query (escape special chars)
+      const sanitized = query.replace(/['"]/g, '').replace(/[^\w\s*-]/g, '');
+      if (!sanitized) {
+        return { success: true, results: [] };
+      }
+
+      const results = db.searchFts(sanitized);
+
+      // Enrich results with entity type and details
+      const Users = db.getModel('users');
+      const Threads = db.getModel('threads');
+      const Posts = db.getModel('posts');
+
+      const enriched = results.map(r => {
+        const id = r.entityId;
+        let type = 'unknown';
+        let extra = {};
+
+        if (id.startsWith('THR_')) {
+          type = 'thread';
+          const thread = Threads.findOne({ id });
+          if (thread) {
+            const author = Users.findOne({ id: thread.authorId });
+            extra = {
+              categoryId: thread.categoryId,
+              authorUsername: author?.username || null,
+              createdAt: thread.createdAt,
+            };
+          }
+        } else if (id.startsWith('POST_')) {
+          type = 'post';
+          const post = Posts.findOne({ id });
+          if (post) {
+            const author = Users.findOne({ id: post.authorId });
+            extra = {
+              threadId: post.threadId,
+              authorUsername: author?.username || null,
+              createdAt: post.createdAt,
+            };
+          }
+        } else if (id.startsWith('USR_')) {
+          type = 'user';
+        }
+
+        return {
+          entityId: id,
+          type,
+          title: r.title,
+          content: r.content?.substring(0, 200) || '',
+          ...extra,
+        };
+      });
+
+      return { success: true, results: enriched, query };
+    } catch (err) {
+      sails.log.error('[api-search]', err.message || err);
+      this.res.status(500);
+      return { success: false, error: err.message || String(err) };
+    }
+  },
+};

@@ -1,0 +1,131 @@
+export const themes = [
+  {
+    id: 'neon-cyber',
+    name: 'Neon Cyber',
+    category: 'dark',
+    base: {
+      background: '#0a0a1a',
+      surface: '#12122a',
+      surfaceHover: '#1a1a3a',
+      border: '#2a2a4a',
+      text: '#e0e0ff',
+      textMuted: '#8888aa',
+    },
+    accent: {
+      primary: '#00f0ff',
+      secondary: '#ff00aa',
+      success: '#00ff88',
+      warning: '#ffaa00',
+      danger: '#ff4444',
+    },
+    typography: {
+      fontFamily: 'Inter',
+      headingFamily: 'Orbitron',
+      borderRadius: '12px',
+    },
+    effects: {
+      glassmorphism: true,
+      neonGlow: true,
+      animations: true,
+    },
+  },
+  {
+    id: 'clean-minimal',
+    name: 'Clean Minimal',
+    category: 'light',
+    base: {
+      background: '#f8fafc',
+      surface: '#ffffff',
+      surfaceHover: '#f1f5f9',
+      border: '#e2e8f0',
+      text: '#1e293b',
+      textMuted: '#64748b',
+    },
+    accent: {
+      primary: '#3b82f6',
+      secondary: '#8b5cf6',
+      success: '#22c55e',
+      warning: '#f59e0b',
+      danger: '#ef4444',
+    },
+    typography: {
+      fontFamily: 'Inter',
+      headingFamily: 'Inter',
+      borderRadius: '8px',
+    },
+    effects: {
+      glassmorphism: false,
+      neonGlow: false,
+      animations: true,
+    },
+  },
+  {
+    id: 'dark-pro',
+    name: 'Dark Pro',
+    category: 'dark',
+    base: {
+      background: '#09090b',
+      surface: '#18181b',
+      surfaceHover: '#27272a',
+      border: '#3f3f46',
+      text: '#fafafa',
+      textMuted: '#a1a1aa',
+    },
+    accent: {
+      primary: '#10b981',
+      secondary: '#6366f1',
+      success: '#22c55e',
+      warning: '#eab308',
+      danger: '#f43f5e',
+    },
+    typography: {
+      fontFamily: 'Space Grotesk',
+      headingFamily: 'Space Grotesk',
+      borderRadius: '10px',
+    },
+    effects: {
+      glassmorphism: true,
+      neonGlow: false,
+      animations: true,
+    },
+  },
+  {
+    id: 'retro-terminal',
+    name: 'Retro Terminal',
+    category: 'dark',
+    base: {
+      background: '#0c0c0c',
+      surface: '#1a1a1a',
+      surfaceHover: '#252525',
+      border: '#333333',
+      text: '#00ff41',
+      textMuted: '#00aa2a',
+    },
+    accent: {
+      primary: '#00ff41',
+      secondary: '#ffb000',
+      success: '#00ff41',
+      warning: '#ffb000',
+      danger: '#ff3333',
+    },
+    typography: {
+      fontFamily: 'JetBrains Mono',
+      headingFamily: 'JetBrains Mono',
+      borderRadius: '4px',
+    },
+    effects: {
+      glassmorphism: false,
+      neonGlow: true,
+      animations: true,
+    },
+  },
+];
+
+export const availableFonts = [
+  'Inter',
+  'Space Grotesk',
+  'JetBrains Mono',
+  'Outfit',
+  'Orbitron',
+  'IBM Plex Sans',
+];
