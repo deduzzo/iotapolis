@@ -1,0 +1,33 @@
+{
+  "name": "iota-free-forum",
+  "version": "0.1.0",
+  "description": "Decentralized forum on IOTA 2.0 blockchain",
+  "keywords": ["iota", "blockchain", "forum", "decentralized"],
+  "private": true,
+  "main": "app.js",
+  "scripts": {
+    "start": "NODE_ENV=production node app.js",
+    "dev": "concurrently \"sails lift\" \"npm run dev:frontend\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@iota/iota-sdk": "^1.10.1",
+    "@scure/bip39": "^2.0.1",
+    "arweave": "^1.15.5",
+    "better-sqlite3": "^12.8.0",
+    "concurrently": "^9.1.0",
+    "express-rate-limit": "^7.1.0",
+    "lodash": "^4.17.21",
+    "sails": "^1.5.0",
+    "sails-hook-orm": "^4.0.0",
+    "sails-hook-sockets": "^2.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=17.0.0"
+  }
+}

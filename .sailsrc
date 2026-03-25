@@ -1,0 +1,4 @@
+{
+  "generators": { "modules": {} },
+  "hooks": { "grunt": false, "views": false, "session": false }
+}

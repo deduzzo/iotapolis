@@ -1,0 +1,8 @@
+node_modules/
+.tmp/
+logs/
+*.log
+.DS_Store
+config/private_iota_conf.js
+config/private_arweave_conf.js
+*.db
