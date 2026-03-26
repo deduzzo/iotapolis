@@ -37,7 +37,7 @@ function avatarGradient(userId) {
  *   showUsername  — if false, always show placeholder even if username exists (privacy)
  *   size         — 'sm' | 'md' | 'lg'
  */
-export default function IdentityBadge({ userId, username, showUsername = true, size = 'md' }) {
+export default function IdentityBadge({ userId, username, showUsername = true, size = 'md', asLink = true }) {
   const [showTooltip, setShowTooltip] = useState(false);
   const s = sizeMap[size] || sizeMap.md;
 
@@ -45,9 +45,14 @@ export default function IdentityBadge({ userId, username, showUsername = true, s
   const initial = (username?.[0] || userId?.[4] || '?').toUpperCase();
   const truncatedId = userId ? `${userId.slice(0, 12)}...` : '';
 
+  const Wrapper = asLink ? Link : 'span';
+  const wrapperProps = asLink
+    ? { to: userId ? `/u/${userId}` : '#' }
+    : {};
+
   return (
-    <Link
-      to={userId ? `/u/${userId}` : '#'}
+    <Wrapper
+      {...wrapperProps}
       className="inline-flex items-center gap-1.5 group relative"
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
@@ -85,6 +90,6 @@ export default function IdentityBadge({ userId, username, showUsername = true, s
           </motion.div>
         )}
       </AnimatePresence>
-    </Link>
+    </Wrapper>
   );
 }

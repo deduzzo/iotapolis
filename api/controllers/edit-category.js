@@ -73,6 +73,7 @@ module.exports = {
 
       // Broadcast
       await sails.helpers.broadcastEvent('dataChanged', {
+        entity: 'category',
         action: 'categoryEdited',
         label: inputs.name,
         categoryId,

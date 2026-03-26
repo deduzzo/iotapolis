@@ -1,8 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, Clock, Edit3, Lock } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
+import { useRealtimeUpdate } from '../hooks/useWebSocket';
 import { api } from '../api/endpoints';
 import { useIdentity } from '../hooks/useIdentity';
 import PostCard from '../components/PostCard';
@@ -23,33 +24,139 @@ export default function Thread() {
   const { id } = useParams();
   const { identity, signAndSend } = useIdentity();
 
-  const { data, loading, error, reload } = useApi(
+  // Non passiamo realtimeEntities — gestiamo noi gli aggiornamenti granulari
+  const { data, loading, error, setData } = useApi(
     () => api.getThread(id),
     [id],
-    ['post', 'thread'],
   );
 
   const [replyContent, setReplyContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [replyToId, setReplyToId] = useState(null);
 
+  // IDs dei post appena aggiunti (per highlight visivo)
+  const [freshPostIds, setFreshPostIds] = useState(new Set());
+  const freshTimers = useRef({});
+
   /* Edit history modal */
   const [historyTarget, setHistoryTarget] = useState(null);
 
   const thread = data?.thread || data;
-  const posts = data?.posts || [];
+  const posts = data?.posts || thread?.posts || [];
+
+  // Segna un post come "fresh" per 3 secondi (feedback visivo)
+  const markFresh = useCallback((postId) => {
+    setFreshPostIds((prev) => new Set(prev).add(postId));
+    clearTimeout(freshTimers.current[postId]);
+    freshTimers.current[postId] = setTimeout(() => {
+      setFreshPostIds((prev) => {
+        const next = new Set(prev);
+        next.delete(postId);
+        return next;
+      });
+      delete freshTimers.current[postId];
+    }, 3000);
+  }, []);
+
+  // WebSocket: aggiornamento granulare per post in questo thread
+  useRealtimeUpdate(
+    useCallback(
+      (wsData) => {
+        if (!data) return;
+
+        if (
+          (wsData.action === 'postCreated' || wsData.action === 'postEdited') &&
+          wsData.threadId === id
+        ) {
+          // Fetch solo i dati del thread aggiornato (non reload pagina intera)
+          api.getThread(id).then((fresh) => {
+            if (!fresh) return;
+            const freshThread = fresh.thread || fresh;
+            const freshPosts = fresh.posts || freshThread?.posts || [];
+
+            setData((prev) => {
+              const prevThread = prev?.thread || prev;
+              const prevPosts = prev?.posts || prevThread?.posts || [];
+              const prevIds = new Set(prevPosts.map((p) => p.id));
+
+              // Trova nuovi post per highlight
+              freshPosts.forEach((p) => {
+                if (!prevIds.has(p.id)) {
+                  markFresh(p.id);
+                }
+              });
+
+              return fresh;
+            });
+          });
+        }
+
+        if (wsData.action === 'voted' && wsData.postId) {
+          // Aggiorna solo lo score del post specifico
+          setData((prev) => {
+            if (!prev) return prev;
+            const prevThread = prev.thread || prev;
+            const prevPosts = prev.posts || prevThread?.posts || [];
+
+            const updatedPosts = prevPosts.map((p) =>
+              p.id === wsData.postId ? { ...p, score: wsData.score ?? p.score } : p,
+            );
+
+            if (prev.posts) {
+              return { ...prev, posts: updatedPosts };
+            }
+            return { ...prev, thread: { ...prevThread, posts: updatedPosts } };
+          });
+        }
+
+        if (wsData.action === 'threadEdited' && wsData.threadId === id) {
+          api.getThread(id).then((fresh) => {
+            if (fresh) setData(fresh);
+          });
+        }
+
+        if (wsData.action === 'threadModerated' && wsData.threadId === id) {
+          api.getThread(id).then((fresh) => {
+            if (fresh) setData(fresh);
+          });
+        }
+      },
+      [id, data, markFresh, setData],
+    ),
+    ['post', 'thread'],
+  );
 
   const handleVote = useCallback(
     async (postId, direction) => {
       if (!identity) return;
       try {
-        await signAndSend('/api/v1/vote', 'POST', { postId, direction });
-        reload();
+        const res = await signAndSend('/api/v1/vote', 'POST', { postId, direction });
+        const result = await res.json().catch(() => ({}));
+
+        // Optimistic update dello score
+        if (result.success) {
+          setData((prev) => {
+            if (!prev) return prev;
+            const prevThread = prev.thread || prev;
+            const prevPosts = prev.posts || prevThread?.posts || [];
+
+            const updatedPosts = prevPosts.map((p) =>
+              p.id === postId
+                ? { ...p, score: result.score ?? p.score, userVote: direction }
+                : p,
+            );
+
+            if (prev.posts) {
+              return { ...prev, posts: updatedPosts };
+            }
+            return { ...prev, thread: { ...prevThread, posts: updatedPosts } };
+          });
+        }
       } catch (err) {
         console.error('Vote failed:', err);
       }
     },
-    [identity, signAndSend, reload],
+    [identity, signAndSend, setData],
   );
 
   const handleReply = useCallback(
@@ -69,20 +176,59 @@ export default function Thread() {
           parentId,
           content: content.trim(),
         });
+        const result = await res.json().catch(() => ({}));
+
         if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || 'Failed to post');
+          throw new Error(result.error || 'Failed to post');
         }
+
+        // Optimistic update: aggiungi il post allo state locale
+        const newPost = {
+          id: result.post?.id || `POST_temp_${Date.now()}`,
+          threadId: id,
+          parentId: parentId || null,
+          content: content.trim(),
+          authorId: identity.userId,
+          authorUsername: identity.username,
+          authorShowUsername: identity.username ? 1 : 0,
+          hidden: 0,
+          version: 1,
+          score: 0,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          children: [],
+        };
+
+        setData((prev) => {
+          if (!prev) return prev;
+          const prevThread = prev.thread || prev;
+          const prevPosts = prev.posts || prevThread?.posts || [];
+
+          const updatedPosts = [...prevPosts, newPost];
+          const updatedThread = {
+            ...prevThread,
+            postCount: (prevThread.postCount || 0) + 1,
+            lastPostAt: Date.now(),
+          };
+
+          if (prev.posts !== undefined) {
+            return { ...prev, thread: updatedThread, posts: updatedPosts };
+          }
+          return { ...prev, thread: { ...updatedThread, posts: updatedPosts } };
+        });
+
+        // Highlight il nuovo post
+        markFresh(newPost.id);
+
         setReplyContent('');
         setReplyToId(null);
-        reload();
       } catch (err) {
         console.error('Reply failed:', err);
       } finally {
         setSubmitting(false);
       }
     },
-    [identity, signAndSend, id, reload],
+    [identity, signAndSend, id, setData, markFresh],
   );
 
   if (loading) {
@@ -246,6 +392,7 @@ export default function Thread() {
           replyToId={replyToId}
           onSubmitReply={submitReply}
           onCancelReply={() => setReplyToId(null)}
+          freshPostIds={freshPostIds}
         />
       </div>
 

@@ -73,6 +73,7 @@ module.exports = {
 
       // Broadcast
       await sails.helpers.broadcastEvent('dataChanged', {
+        entity: 'thread',
         action: 'threadEdited',
         label: inputs.title,
         threadId,

@@ -27,7 +27,7 @@ function formatTime(dateStr) {
   return d.toLocaleDateString();
 }
 
-export default function ThreadList({ threads }) {
+export default function ThreadList({ threads, freshThreadIds }) {
   if (!threads || threads.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
@@ -54,72 +54,81 @@ export default function ThreadList({ threads }) {
       className="space-y-3"
     >
       <AnimatePresence>
-        {sorted.map((thread) => (
-          <motion.div key={thread.id} variants={item} layout>
-            <Link to={`/t/${thread.id}`}>
-              <motion.div
-                whileHover={{ scale: 1.01, x: 4 }}
-                className="glass-card cursor-pointer hover:neon-border transition-shadow"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      {thread.pinned && (
-                        <span
-                          className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full shrink-0"
-                          style={{
-                            backgroundColor: 'var(--color-success)',
-                            color: 'var(--color-background)',
-                          }}
-                        >
-                          <Pin size={10} />
-                          Pinned
-                        </span>
-                      )}
-                      {thread.locked && (
-                        <span
-                          className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full shrink-0"
-                          style={{
-                            backgroundColor: 'var(--color-warning)',
-                            color: 'var(--color-background)',
-                          }}
-                        >
-                          <Lock size={10} />
-                          Locked
-                        </span>
-                      )}
-                      <h3 className="font-semibold text-sm md:text-base truncate">
-                        {thread.title}
-                      </h3>
-                    </div>
+        {sorted.map((thread) => {
+          const isFresh = freshThreadIds?.has(thread.id);
+          return (
+            <motion.div key={thread.id} variants={item} layout>
+              <Link to={`/t/${thread.id}`}>
+                <motion.div
+                  whileHover={{ scale: 1.01, x: 4 }}
+                  className="glass-card cursor-pointer hover:neon-border"
+                  style={{
+                    boxShadow: isFresh ? '0 0 12px rgba(0, 255, 136, 0.15)' : undefined,
+                    borderColor: isFresh ? 'var(--color-success)' : undefined,
+                    transition: 'box-shadow 0.6s ease, border-color 0.6s ease',
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        {thread.pinned && (
+                          <span
+                            className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full shrink-0"
+                            style={{
+                              backgroundColor: 'var(--color-success)',
+                              color: 'var(--color-background)',
+                            }}
+                          >
+                            <Pin size={10} />
+                            Pinned
+                          </span>
+                        )}
+                        {thread.locked && (
+                          <span
+                            className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full shrink-0"
+                            style={{
+                              backgroundColor: 'var(--color-warning)',
+                              color: 'var(--color-background)',
+                            }}
+                          >
+                            <Lock size={10} />
+                            Locked
+                          </span>
+                        )}
+                        <h3 className="font-semibold text-sm md:text-base truncate">
+                          {thread.title}
+                        </h3>
+                      </div>
 
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <IdentityBadge
-                        userId={thread.authorId}
-                        username={thread.authorName}
-                        size="sm"
-                      />
-                      <span
-                        className="flex items-center gap-1 text-xs"
-                        style={{ color: 'var(--color-text-muted)' }}
-                      >
-                        <MessageSquare size={12} />
-                        {thread.postCount ?? 0}
-                      </span>
-                      <span
-                        className="flex items-center gap-1 text-xs"
-                        style={{ color: 'var(--color-text-muted)' }}
-                      >
-                        <Clock size={12} />
-                        {formatTime(thread.lastActivity || thread.createdAt)}
-                      </span>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <IdentityBadge
+                          userId={thread.authorId}
+                          username={thread.authorName}
+                          size="sm"
+                          asLink={false}
+                        />
+                        <span
+                          className="flex items-center gap-1 text-xs"
+                          style={{ color: 'var(--color-text-muted)' }}
+                        >
+                          <MessageSquare size={12} />
+                          {thread.postCount ?? 0}
+                        </span>
+                        <span
+                          className="flex items-center gap-1 text-xs"
+                          style={{ color: 'var(--color-text-muted)' }}
+                        >
+                          <Clock size={12} />
+                          {formatTime(thread.lastActivity || thread.createdAt)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </motion.div>
-            </Link>
-          </motion.div>
-        ))}
+                </motion.div>
+              </Link>
+            </motion.div>
+          );
+        })}
       </AnimatePresence>
     </motion.div>
   );

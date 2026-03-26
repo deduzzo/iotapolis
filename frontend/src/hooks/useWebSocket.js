@@ -89,3 +89,30 @@ export function useRealtimeRefresh(reloadFn, filterEntities = null) {
     };
   }, [filterEntities?.join?.(',')]);
 }
+
+/**
+ * Hook per aggiornamenti granulari via websocket.
+ * Invece di fare reload(), chiama onEvent(wsData) per ogni dataChanged
+ * che matcha uno degli entity types specificati.
+ *
+ * @param {function} onEvent - callback (wsData) => void, riceve il payload del broadcast
+ * @param {string[]} filterEntities - entity types da ascoltare (es. ['post', 'thread'])
+ */
+export function useRealtimeUpdate(onEvent, filterEntities = null) {
+  const onEventRef = useRef(onEvent);
+  onEventRef.current = onEvent;
+
+  useEffect(() => {
+    getSocket();
+
+    const handler = (data) => {
+      if (filterEntities && !filterEntities.includes(data.entity)) return;
+      onEventRef.current?.(data);
+    };
+
+    _listeners.add(handler);
+    return () => {
+      _listeners.delete(handler);
+    };
+  }, [filterEntities?.join?.(',')]);
+}

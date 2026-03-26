@@ -104,6 +104,7 @@ module.exports = {
 
       // Broadcast
       await sails.helpers.broadcastEvent('dataChanged', {
+        entity: entityType,
         action: 'moderated',
         label: inputs.action,
         entityId,

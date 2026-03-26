@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Plus, ChevronLeft, ChevronRight, Home } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
+import { useRealtimeUpdate } from '../hooks/useWebSocket';
 import { api } from '../api/endpoints';
 import { useIdentity } from '../hooks/useIdentity';
 import ThreadList from '../components/ThreadList';
@@ -13,10 +14,81 @@ export default function Category() {
   const { identity } = useIdentity();
   const [page, setPage] = useState(1);
 
-  const { data, loading, error } = useApi(
+  // Nessun realtimeEntities — gestiamo granularmente
+  const { data, loading, error, setData } = useApi(
     () => api.getThreads(id, page),
     [id, page],
-    ['thread'],
+  );
+
+  // IDs di thread appena aggiornati (per highlight)
+  const [freshThreadIds, setFreshThreadIds] = useState(new Set());
+
+  const markThreadFresh = useCallback((threadId) => {
+    setFreshThreadIds((prev) => new Set(prev).add(threadId));
+    setTimeout(() => {
+      setFreshThreadIds((prev) => {
+        const next = new Set(prev);
+        next.delete(threadId);
+        return next;
+      });
+    }, 3000);
+  }, []);
+
+  // WebSocket: aggiornamenti granulari
+  useRealtimeUpdate(
+    useCallback(
+      (wsData) => {
+        // Nuovo post in un thread di questa categoria
+        if (wsData.action === 'postCreated' && wsData.threadId) {
+          setData((prev) => {
+            if (!prev) return prev;
+            const threads = Array.isArray(prev) ? prev : prev?.threads || prev?.data || [];
+            const idx = threads.findIndex((t) => t.id === wsData.threadId);
+            if (idx === -1) return prev;
+
+            const updated = [...threads];
+            updated[idx] = {
+              ...updated[idx],
+              postCount: (updated[idx].postCount || 0) + 1,
+              lastActivity: Date.now(),
+              lastPostAt: Date.now(),
+            };
+
+            markThreadFresh(wsData.threadId);
+
+            if (Array.isArray(prev)) return updated;
+            if (prev.threads) return { ...prev, threads: updated };
+            return { ...prev, data: updated };
+          });
+        }
+
+        // Nuovo thread in questa categoria
+        if (wsData.action === 'threadCreated' && wsData.categoryId === id) {
+          // Fetch la lista aggiornata
+          api.getThreads(id, page).then((fresh) => {
+            if (fresh) {
+              setData(fresh);
+              if (wsData.threadId) markThreadFresh(wsData.threadId);
+            }
+          });
+        }
+
+        // Thread modificato
+        if (
+          (wsData.action === 'threadEdited' || wsData.action === 'threadModerated') &&
+          wsData.threadId
+        ) {
+          api.getThreads(id, page).then((fresh) => {
+            if (fresh) {
+              setData(fresh);
+              markThreadFresh(wsData.threadId);
+            }
+          });
+        }
+      },
+      [id, page, setData, markThreadFresh],
+    ),
+    ['post', 'thread'],
   );
 
   const threads = Array.isArray(data) ? data : data?.threads || data?.data || [];
@@ -73,7 +145,7 @@ export default function Category() {
       </div>
 
       {/* Thread list */}
-      <ThreadList threads={threads} />
+      <ThreadList threads={threads} freshThreadIds={freshThreadIds} />
 
       {/* Pagination */}
       {totalPages > 1 && (

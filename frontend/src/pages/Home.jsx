@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Folder, MessageSquare, FileText, Clock, Plus, Share2, Copy, CheckCircle, X, ExternalLink, Globe, Shield, AlertCircle } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
+import { useRealtimeUpdate } from '../hooks/useWebSocket';
 import { useIdentity } from '../hooks/useIdentity';
 import { api } from '../api/endpoints';
 import BlockchainInfo from '../components/BlockchainInfo';
@@ -34,10 +35,72 @@ function formatTime(dateStr) {
 
 export default function Home() {
   const { identity } = useIdentity();
-  const { data: categories, loading, error } = useApi(
+  const { data: categories, loading, error, setData: setCategories } = useApi(
     () => api.getCategories(),
     [],
-    ['category'],
+  );
+
+  // IDs categorie aggiornate di recente (per highlight)
+  const [freshCatIds, setFreshCatIds] = useState(new Set());
+
+  const markCatFresh = useCallback((catId) => {
+    setFreshCatIds((prev) => new Set(prev).add(catId));
+    setTimeout(() => {
+      setFreshCatIds((prev) => {
+        const next = new Set(prev);
+        next.delete(catId);
+        return next;
+      });
+    }, 3000);
+  }, []);
+
+  // WebSocket: aggiornamenti granulari per categorie
+  useRealtimeUpdate(
+    useCallback(
+      (wsData) => {
+        if (wsData.action === 'categoryCreated' || wsData.action === 'categoryEdited') {
+          api.getCategories().then((fresh) => {
+            if (fresh) {
+              setCategories(fresh);
+              if (wsData.categoryId) markCatFresh(wsData.categoryId);
+            }
+          });
+        }
+
+        // Un nuovo thread/post aggiorna i contatori della categoria
+        if (wsData.action === 'threadCreated' && wsData.categoryId) {
+          setCategories((prev) => {
+            if (!prev) return prev;
+            const list = Array.isArray(prev) ? prev : prev?.categories || prev?.data || [];
+            const idx = list.findIndex((c) => c.id === wsData.categoryId);
+            if (idx === -1) return prev;
+
+            const updated = [...list];
+            updated[idx] = {
+              ...updated[idx],
+              threadCount: (updated[idx].threadCount || 0) + 1,
+              lastActivity: Date.now(),
+            };
+
+            markCatFresh(wsData.categoryId);
+
+            if (Array.isArray(prev)) return updated;
+            if (prev.categories) return { ...prev, categories: updated };
+            return { ...prev, data: updated };
+          });
+        }
+
+        if (wsData.action === 'postCreated' && wsData.threadId) {
+          // Aggiorna i contatori post — serve sapere la categoryId.
+          // Facciamo un refresh leggero.
+          api.getCategories().then((fresh) => {
+            if (fresh) setCategories(fresh);
+          });
+        }
+      },
+      [setCategories, markCatFresh],
+    ),
+    ['category', 'thread', 'post'],
   );
   const { data: userProfile } = useApi(
     () => identity?.userId ? api.getUser(identity.userId) : Promise.resolve(null),
@@ -173,12 +236,19 @@ export default function Home() {
         animate="show"
         className="grid grid-cols-1 md:grid-cols-2 gap-4"
       >
-        {list.map((cat) => (
+        {list.map((cat) => {
+          const isCatFresh = freshCatIds.has(cat.id);
+          return (
           <motion.div key={cat.id} variants={item}>
             <Link to={`/c/${cat.id}`}>
               <motion.div
                 whileHover={{ scale: 1.02, y: -2 }}
-                className="glass-card cursor-pointer hover:neon-border transition-shadow"
+                className="glass-card cursor-pointer hover:neon-border"
+                style={{
+                  boxShadow: isCatFresh ? '0 0 12px rgba(0, 255, 136, 0.15)' : undefined,
+                  borderColor: isCatFresh ? 'var(--color-success)' : undefined,
+                  transition: 'box-shadow 0.6s ease, border-color 0.6s ease',
+                }}
               >
                 <div className="flex items-start gap-3 mb-3">
                   <div
@@ -226,7 +296,8 @@ export default function Home() {
               </motion.div>
             </Link>
           </motion.div>
-        ))}
+          );
+        })}
       </motion.div>
 
       {/* Share Forum Modal */}

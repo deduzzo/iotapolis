@@ -83,6 +83,7 @@ module.exports = {
 
       // Broadcast
       await sails.helpers.broadcastEvent('dataChanged', {
+        entity: 'config',
         action: 'themeUpdated',
         label: inputs.baseTheme,
         version: newVersion,

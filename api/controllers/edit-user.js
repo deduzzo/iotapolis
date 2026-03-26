@@ -64,6 +64,7 @@ module.exports = {
 
       // Broadcast
       await sails.helpers.broadcastEvent('dataChanged', {
+        entity: 'user',
         action: 'userUpdated',
         label: user.username,
         userId,

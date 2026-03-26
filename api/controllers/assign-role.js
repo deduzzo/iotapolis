@@ -71,6 +71,7 @@ module.exports = {
 
       // Broadcast
       await sails.helpers.broadcastEvent('dataChanged', {
+        entity: 'user',
         action: 'roleAssigned',
         label: `${inputs.targetUserId} → ${inputs.role}`,
         targetUserId: inputs.targetUserId,

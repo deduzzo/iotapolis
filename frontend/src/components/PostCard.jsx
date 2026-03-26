@@ -27,6 +27,7 @@ export default function PostCard({
   replyToId,
   onSubmitReply,
   onCancelReply,
+  isFresh,
 }) {
   const [replyContent, setReplyContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -50,7 +51,9 @@ export default function PostCard({
       transition={{ duration: 0.3 }}
       className="glass-card"
       style={{
-        borderLeft: '3px solid var(--color-primary)',
+        borderLeft: `3px solid ${isFresh ? 'var(--color-success)' : 'var(--color-primary)'}`,
+        boxShadow: isFresh ? '0 0 12px rgba(0, 255, 136, 0.15)' : undefined,
+        transition: 'border-color 0.6s ease, box-shadow 0.6s ease',
       }}
     >
       <div className="flex gap-3">

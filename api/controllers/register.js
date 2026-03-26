@@ -114,6 +114,7 @@ module.exports = {
 
       // Broadcast
       await sails.helpers.broadcastEvent('dataChanged', {
+        entity: 'user',
         action: 'userRegistered',
         label: username,
         userId,

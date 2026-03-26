@@ -14,6 +14,7 @@ export default function NestedReplies({
   replyToId,
   onSubmitReply,
   onCancelReply,
+  freshPostIds,
 }) {
   if (!posts || posts.length === 0) return null;
 
@@ -49,6 +50,7 @@ export default function NestedReplies({
             replyToId={replyToId}
             onSubmitReply={onSubmitReply}
             onCancelReply={onCancelReply}
+            isFresh={freshPostIds?.has(post.id)}
           />
           {/* Recursively render children */}
           <NestedReplies
@@ -63,6 +65,7 @@ export default function NestedReplies({
             replyToId={replyToId}
             onSubmitReply={onSubmitReply}
             onCancelReply={onCancelReply}
+            freshPostIds={freshPostIds}
           />
         </div>
       ))}
