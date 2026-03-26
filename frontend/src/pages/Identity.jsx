@@ -182,9 +182,10 @@ function UsernameCard({ identity, onRegister, onExport }) {
     setSubmitting(true);
     try {
       await onRegister(username);
+      // Registration succeeded — redirect to home
+      window.location.href = '/';
     } catch (err) {
       setError(err.message);
-    } finally {
       setSubmitting(false);
     }
   }

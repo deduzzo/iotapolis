@@ -83,6 +83,16 @@ module.exports = {
       });
       console.log('[register] Blockchain publish result:', JSON.stringify(txResult));
 
+      if (!txResult.success) {
+        console.log('[register] TX failed — registration aborted. Error:', txResult.error);
+        this.res.status(503);
+        return {
+          success: false,
+          error: 'Blockchain transaction failed: ' + (txResult.error || 'unknown'),
+          retryQueued: true,
+        };
+      }
+
       // Update role if admin (processTransaction defaults to 'user')
       if (isFirstUser) {
         Users.update(userId, { role: 'admin' });
