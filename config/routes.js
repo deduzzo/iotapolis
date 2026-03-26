@@ -30,4 +30,5 @@ module.exports.routes = {
   'GET /api/v1/forum-info': { action: 'api-forum-info' },
   'POST /api/v1/sync-connect': { action: 'sync-connect' },
   'POST /api/v1/full-reset': { action: 'full-reset' },
+  'GET /api/v1/integrity-check': { action: 'api-integrity-check' },
 };
