@@ -9,7 +9,9 @@ export default function NestedReplies({
   onReply,
   onVote,
   onEdit,
+  onModerate,
   currentUserId,
+  userRole,
   threadLocked,
   onShowHistory,
   replyToId,
@@ -41,7 +43,9 @@ export default function NestedReplies({
             onReply={onReply}
             onVote={onVote}
             onEdit={onEdit}
+            onModerate={onModerate}
             currentUserId={currentUserId}
+            userRole={userRole}
             threadLocked={threadLocked}
             onShowHistory={onShowHistory}
             replyToId={replyToId}
@@ -57,7 +61,9 @@ export default function NestedReplies({
             onReply={onReply}
             onVote={onVote}
             onEdit={onEdit}
+            onModerate={onModerate}
             currentUserId={currentUserId}
+            userRole={userRole}
             threadLocked={threadLocked}
             onShowHistory={onShowHistory}
             replyToId={replyToId}

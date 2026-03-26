@@ -22,7 +22,8 @@ export const api = {
 
   // Users
   getUsers: (params = {}) => {
-    const q = new URLSearchParams(params).toString();
+    const clean = Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== ''));
+    const q = new URLSearchParams(clean).toString();
     return fetch(`${API_BASE}/members${q ? '?' + q : ''}`).then((r) => r.json());
   },
   getUser: (id) =>

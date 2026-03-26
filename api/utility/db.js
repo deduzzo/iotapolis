@@ -521,7 +521,7 @@ function getThreadDetail(threadId) {
       u.showUsername as authorShowUsername
     FROM posts p
     LEFT JOIN users u ON p.authorId = u.id
-    WHERE p.threadId = ? AND p.hidden = 0
+    WHERE p.threadId = ?
     ORDER BY p.createdAt ASC
   `).all(threadId);
 

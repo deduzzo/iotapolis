@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, Edit3, Clock, History, Save, X, Quote, Shield } from 'lucide-react';
+import { MessageSquare, Edit3, Clock, History, Save, X, Quote, Shield, EyeOff, Eye, Trash2 } from 'lucide-react';
 import IdentityBadge from './IdentityBadge';
 import MarkdownRender from './MarkdownRender';
 import RichEditor from './RichEditor';
@@ -34,7 +34,9 @@ export default function PostCard({
   onReply,
   onVote,
   onEdit,
+  onModerate,
   currentUserId,
+  userRole,
   threadLocked,
   onShowHistory,
   replyToId,
@@ -53,6 +55,8 @@ export default function PostCard({
   const [editSubmitting, setEditSubmitting] = useState(false);
 
   const isAuthor = currentUserId && currentUserId === post.authorId;
+  const isMod = userRole === 'moderator' || userRole === 'admin';
+  const canEdit = isAuthor || isMod;
 
   async function handleSubmitInlineReply() {
     if (!replyContent.trim()) return;
@@ -135,11 +139,21 @@ export default function PostCard({
         tipCount={post.tipCount || 0}
         totalTips={post.totalTips || 0}
       />
-      {isAuthor && !editing && (
+      {canEdit && !editing && (
         <button onClick={startEdit}
           className="flex items-center gap-1 text-xs hover:underline transition-colors"
           style={{ color: 'var(--color-text-muted)' }}>
           <Edit3 size={12} />{t('post.edit')}
+        </button>
+      )}
+      {isMod && (
+        <button
+          onClick={() => onModerate?.(post.id, post.hidden ? 'unhide' : 'hide')}
+          className="flex items-center gap-1 text-xs hover:underline transition-colors"
+          style={{ color: post.hidden ? 'var(--color-success)' : 'var(--color-danger)' }}
+        >
+          {post.hidden ? <Eye size={12} /> : <EyeOff size={12} />}
+          {post.hidden ? t('post.unhide', 'Mostra') : t('post.hide', 'Nascondi')}
         </button>
       )}
       <button onClick={() => onShowHistory?.(post.id)}
@@ -154,17 +168,20 @@ export default function PostCard({
   /* ═════════════════════════════════════════════════════════════════
      INVISION / FORUM LAYOUT — avatar sidebar + content area
      ═════════════════════════════════════════════════════════════════ */
+  const isHidden = !!post.hidden;
+
   if (layout === 'table') {
     const displayName = post.authorUsername || post.authorName || post.authorId?.slice(0, 12);
     return (
       <motion.div
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="rounded-xl overflow-hidden border"
+        className="rounded-xl overflow-visible border"
         style={{
-          borderColor: isFresh ? 'var(--color-success)' : 'var(--color-border)',
+          borderColor: isHidden ? 'var(--color-danger)' : isFresh ? 'var(--color-success)' : 'var(--color-border)',
           boxShadow: isFresh ? '0 0 12px rgba(0,255,136,0.15)' : 'var(--shadow-card)',
-          transition: 'border-color 0.6s ease, box-shadow 0.6s ease',
+          opacity: isHidden ? 0.4 : 1,
+          transition: 'border-color 0.6s ease, box-shadow 0.6s ease, opacity 0.3s ease',
         }}
       >
         {/* Post header bar */}
@@ -244,8 +261,9 @@ export default function PostCard({
       transition={{ duration: 0.3 }}
       className="glass-card"
       style={{
-        borderLeft: `3px solid ${isFresh ? 'var(--color-success)' : 'var(--color-primary)'}`,
+        borderLeft: `3px solid ${isHidden ? 'var(--color-danger)' : isFresh ? 'var(--color-success)' : 'var(--color-primary)'}`,
         boxShadow: isFresh ? '0 0 12px rgba(0,255,136,0.15)' : undefined,
+        opacity: isHidden ? 0.4 : 1,
         transition: 'border-color 0.6s ease, box-shadow 0.6s ease',
       }}
     >
@@ -255,6 +273,12 @@ export default function PostCard({
           <div className="flex items-center gap-3 mb-2 flex-wrap">
             <IdentityBadge userId={post.authorId} username={post.authorUsername || post.authorName}
               showUsername={!!post.authorShowUsername} size="sm" />
+            {isHidden && (
+              <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full"
+                style={{ backgroundColor: 'rgba(255,68,68,0.15)', color: 'var(--color-danger)' }}>
+                <EyeOff size={10} />{t('post.hidden', 'Nascosto')}
+              </span>
+            )}
             <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
               <Clock size={12} />{formatDate(post.createdAt)}
             </span>

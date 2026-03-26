@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Home, Clock, Edit3, Lock, History, Save, X } from 'lucide-react';
+import { Home, Clock, Edit3, Lock, History, Save, X, Eye, EyeOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useApi } from '../hooks/useApi';
 import { useRealtimeUpdate } from '../hooks/useWebSocket';
@@ -30,6 +30,14 @@ export default function Thread() {
   const { identity, postEvent } = useIdentity();
   const { addToast } = useToast();
   const { activeThemeId } = useTheme();
+
+  // Get current user's role for moderation
+  const { data: userProfile } = useApi(
+    () => identity?.userId ? api.getUser(identity.userId) : Promise.resolve(null),
+    [identity?.userId],
+    ['user'],
+  );
+  const userRole = userProfile?.user?.role || 'user';
   const isInvisionLayout = activeThemeId?.startsWith('invision');
 
   // Non passiamo realtimeEntities — gestiamo noi gli aggiornamenti granulari
@@ -46,6 +54,9 @@ export default function Thread() {
   const [freshPostIds, setFreshPostIds] = useState(new Set());
   const freshTimers = useRef({});
 
+  // Show hidden posts toggle
+  const [showHidden, setShowHidden] = useState(false);
+
   // Edit OP state
   const [editingOP, setEditingOP] = useState(false);
   const [editOPContent, setEditOPContent] = useState('');
@@ -55,7 +66,9 @@ export default function Thread() {
   const [historyTarget, setHistoryTarget] = useState(null);
 
   const thread = data?.thread || data;
-  const posts = data?.posts || thread?.posts || [];
+  const allPosts = data?.posts || thread?.posts || [];
+  const posts = showHidden ? allPosts : allPosts.filter(p => !p.hidden);
+  const hiddenCount = allPosts.filter(p => p.hidden).length;
 
   // Segna un post come "fresh" per 3 secondi (feedback visivo)
   const markFresh = useCallback((postId) => {
@@ -327,6 +340,40 @@ export default function Thread() {
     }
   }, [identity, postEvent, id, editOPContent, thread, setData]);
 
+  // Moderate a post (hide/unhide) — requires MODERATOR or ADMIN
+  const handleModerate = useCallback(
+    async (postId, action) => {
+      if (!identity || !postEvent) return;
+      try {
+        const modId = `MOD_${Date.now().toString(36).toUpperCase()}`;
+        await postEvent('FORUM_MODERATION', modId, {
+          id: modId,
+          postId,
+          entityType: 'post',
+          action,
+          reason: action === 'hide' ? 'Nascosto da moderatore' : 'Ripristinato da moderatore',
+          createdAt: Date.now(),
+        }, 1);
+        addToast(action === 'hide' ? 'Post nascosto' : 'Post ripristinato', 'success');
+        // Optimistic update
+        setData((prev) => {
+          if (!prev) return prev;
+          const prevThread = prev.thread || prev;
+          const prevPosts = prev.posts || prevThread?.posts || [];
+          const updatedPosts = prevPosts.map(p =>
+            p.id === postId ? { ...p, hidden: action === 'hide' ? 1 : 0 } : p
+          );
+          if (prev.posts !== undefined) return { ...prev, posts: updatedPosts };
+          return { ...prev, thread: { ...prevThread, posts: updatedPosts } };
+        });
+      } catch (err) {
+        console.error('Moderate failed:', err);
+        addToast('Errore moderazione: ' + err.message, 'error');
+      }
+    },
+    [identity, postEvent, addToast, setData],
+  );
+
   if (loading) {
     return <LoadingSpinner size={32} className="min-h-[40vh]" />;
   }
@@ -497,12 +544,30 @@ export default function Thread() {
 
       {/* Replies */}
       <div className="mb-6">
-        <h2
-          className="text-lg font-bold mb-4"
-          style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-text-muted)' }}
-        >
-          {t('thread.replies', { count: posts.length })}
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2
+            className="text-lg font-bold"
+            style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-text-muted)' }}
+          >
+            {t('thread.replies', { count: posts.length })}
+          </h2>
+          {hiddenCount > 0 && (
+            <button
+              onClick={() => setShowHidden(!showHidden)}
+              className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg border transition-all"
+              style={{
+                borderColor: showHidden ? 'var(--color-warning)' : 'var(--color-border)',
+                color: showHidden ? 'var(--color-warning)' : 'var(--color-text-muted)',
+                backgroundColor: showHidden ? 'rgba(245,158,11,0.08)' : 'transparent',
+              }}
+            >
+              {showHidden ? <Eye size={13} /> : <EyeOff size={13} />}
+              {showHidden
+                ? t('thread.hideHidden', `Nascondi moderati (${hiddenCount})`)
+                : t('thread.showHidden', `Mostra moderati (${hiddenCount})`)}
+            </button>
+          )}
+        </div>
 
         <NestedReplies
           posts={posts}
@@ -511,7 +576,9 @@ export default function Thread() {
           onReply={handleReply}
           onVote={handleVote}
           onEdit={handleEditPost}
+          onModerate={handleModerate}
           currentUserId={currentUserId}
+          userRole={userRole}
           threadLocked={isLocked}
           onShowHistory={(entityId) =>
             setHistoryTarget({ entityType: 'post', entityId })

@@ -109,11 +109,11 @@ export default function TipButton({ postId, authorId, tipCount = 0, totalTips = 
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="absolute left-0 top-full mt-2 z-50 w-56 rounded-xl border p-3 shadow-lg"
+            className="absolute left-0 bottom-full mb-2 z-[100] w-56 rounded-xl border p-3 shadow-lg"
             style={{
-              background: 'var(--color-surface)',
+              background: 'var(--color-background)',
               borderColor: 'var(--color-border)',
-              boxShadow: '0 10px 40px rgba(0,0,0,0.4)',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
             }}
           >
             <div className="flex items-center justify-between mb-2">

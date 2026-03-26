@@ -313,8 +313,9 @@ class ForumManager {
     let isFirstUser = false;
 
     if (existing) {
-      // Version-aware: skip if already up to date
-      if (data.version && existing.version && data.version <= existing.version) return;
+      // Version-aware: skip if same version or older
+      const incomingVersion = data.version || 1;
+      if (incomingVersion <= existing.version) return;
 
       User.update(userId, {
         username: data.username,
@@ -323,7 +324,7 @@ class ForumManager {
         publicKey: data.publicKey,
         role: data.role || existing.role || 'user',
         showUsername: data.showUsername != null ? (data.showUsername ? 1 : 0) : existing.showUsername,
-        version: data.version || (existing.version || 0) + 1,
+        version: incomingVersion,
         updatedAt: data.updatedAt || Date.now(),
       });
     } else {
@@ -464,8 +465,9 @@ class ForumManager {
     const existing = Thread.findOne({ id: data.id });
 
     if (existing) {
-      // Version-aware: only update if version > existing
-      if (data.version && existing.version && data.version <= existing.version) return;
+      // Version-aware: skip if same version or older
+      const incomingVersion = data.version || 1;
+      if (incomingVersion <= existing.version) return;
 
       Thread.update(data.id, {
         title: data.title,
@@ -476,7 +478,7 @@ class ForumManager {
         pinned: data.pinned != null ? (data.pinned ? 1 : 0) : existing.pinned,
         locked: data.locked != null ? (data.locked ? 1 : 0) : existing.locked,
         hidden: data.hidden != null ? (data.hidden ? 1 : 0) : existing.hidden,
-        version: data.version || (existing.version + 1),
+        version: incomingVersion,
         lastPostAt: data.lastPostAt || existing.lastPostAt,
         postCount: data.postCount != null ? data.postCount : existing.postCount,
         updatedAt: data.updatedAt || Date.now(),
@@ -516,13 +518,14 @@ class ForumManager {
     const existing = Post.findOne({ id: data.id });
 
     if (existing) {
-      // Version-aware: only update if version > existing
-      if (data.version && existing.version && data.version <= existing.version) return;
+      // Version-aware: skip if same version or older
+      const incomingVersion = data.version || 1;
+      if (incomingVersion <= existing.version) return;
 
       Post.update(data.id, {
         content: data.content,
         hidden: data.hidden != null ? (data.hidden ? 1 : 0) : existing.hidden,
-        version: data.version || (existing.version + 1),
+        version: incomingVersion,
         score: data.score != null ? data.score : existing.score,
         updatedAt: data.updatedAt || Date.now(),
       });
