@@ -962,7 +962,8 @@ async function requestFaucet() {
 // Move contract integration
 // =========================================================================
 
-const ADMIN_TAGS = ['FORUM_ROLE', 'FORUM_MODERATION', 'FORUM_CONFIG', 'FORUM_CATEGORY'];
+const ADMIN_TAGS = ['FORUM_ROLE', 'FORUM_CONFIG'];
+const MOD_TAGS = ['FORUM_MODERATION', 'FORUM_CATEGORY'];
 const CLOCK_OBJECT_ID = '0x6';
 
 /**
@@ -1020,9 +1021,19 @@ async function publishDataMove(tag, dataObject, entityId, version = 1) {
 
       const isRegistration = tag === 'FORUM_USER' && version === 1;
       const isAdmin = ADMIN_TAGS.includes(tag);
+      const isMod = MOD_TAGS.includes(tag);
+
+      // Route to the correct Move function based on required permission level
+      const commonArgs = [
+        tx.pure.vector('u8', Array.from(Buffer.from(tag, 'utf8'))),
+        tx.pure.vector('u8', Array.from(Buffer.from(entityId, 'utf8'))),
+        tx.pure.vector('u8', Array.from(compressed)),
+        tx.pure.u64(version),
+        tx.object(CLOCK_OBJECT_ID),
+      ];
 
       if (isRegistration) {
-        // Use register() for new user registration
+        // register() — open to anyone, one-time
         tx.moveCall({
           target: `${packageId}::forum::register`,
           arguments: [
@@ -1033,34 +1044,22 @@ async function publishDataMove(tag, dataObject, entityId, version = 1) {
           ],
         });
       } else if (isAdmin) {
-        // Use admin_post_event() for admin operations
-        if (!adminCapId) {
-          throw new Error('AdminCap not configured. Only the forum creator can perform admin operations.');
-        }
+        // admin_post_event() — requires ROLE_ADMIN on-chain
         tx.moveCall({
           target: `${packageId}::forum::admin_post_event`,
-          arguments: [
-            tx.object(forumObjectId),
-            tx.object(adminCapId),
-            tx.pure.vector('u8', Array.from(Buffer.from(tag, 'utf8'))),
-            tx.pure.vector('u8', Array.from(Buffer.from(entityId, 'utf8'))),
-            tx.pure.vector('u8', Array.from(compressed)),
-            tx.pure.u64(version),
-            tx.object(CLOCK_OBJECT_ID),
-          ],
+          arguments: [tx.object(forumObjectId), ...commonArgs],
+        });
+      } else if (isMod) {
+        // mod_post_event() — requires ROLE_MODERATOR on-chain
+        tx.moveCall({
+          target: `${packageId}::forum::mod_post_event`,
+          arguments: [tx.object(forumObjectId), ...commonArgs],
         });
       } else {
-        // Use post_event() for regular forum operations
+        // post_event() — requires ROLE_USER (active, not banned)
         tx.moveCall({
           target: `${packageId}::forum::post_event`,
-          arguments: [
-            tx.object(forumObjectId),
-            tx.pure.vector('u8', Array.from(Buffer.from(tag, 'utf8'))),
-            tx.pure.vector('u8', Array.from(Buffer.from(entityId, 'utf8'))),
-            tx.pure.vector('u8', Array.from(compressed)),
-            tx.pure.u64(version),
-            tx.object(CLOCK_OBJECT_ID),
-          ],
+          arguments: [tx.object(forumObjectId), ...commonArgs],
         });
       }
 
@@ -1096,6 +1095,51 @@ async function publishDataMove(tag, dataObject, entityId, version = 1) {
     } catch (err) {
       sails.log.error(`[iota] publishDataMove ERROR: ${err.message}`);
       return { success: false, digest: null, error: err.message, explorerUrl: null };
+    }
+  });
+}
+
+/**
+ * Change a user's role on-chain via Move contract.
+ * Requires the caller to be MODERATOR or ADMIN.
+ * @param {string} targetAddress - IOTA address of the user
+ * @param {number} newRole - 0=banned, 1=user, 2=moderator, 3=admin
+ */
+async function setUserRole(targetAddress, newRole) {
+  return _enqueueTx(async () => {
+    try {
+      const sdk = await loadSdk();
+      const client = await getClient();
+      const keypair = await getKeypair();
+      const { packageId, forumObjectId } = _getMoveConfig();
+
+      const tx = new sdk.Transaction();
+      tx.moveCall({
+        target: `${packageId}::forum::set_user_role`,
+        arguments: [
+          tx.object(forumObjectId),
+          tx.pure.address(targetAddress),
+          tx.pure.u8(newRole),
+          tx.object(CLOCK_OBJECT_ID),
+        ],
+      });
+      tx.setGasBudget(10_000_000);
+
+      const result = await client.signAndExecuteTransaction({
+        signer: keypair,
+        transaction: tx,
+        options: { showEffects: true },
+      });
+
+      if (result.effects?.status?.status !== 'success') {
+        return { success: false, error: result.effects?.status?.error || 'TX failed' };
+      }
+
+      sails.log.info(`[iota] setUserRole: ${targetAddress} -> role ${newRole} (TX: ${result.digest})`);
+      return { success: true, digest: result.digest };
+    } catch (err) {
+      sails.log.error(`[iota] setUserRole ERROR: ${err.message}`);
+      return { success: false, error: err.message };
     }
   });
 }
@@ -1226,4 +1270,5 @@ module.exports = {
   publishDataMove,
   queryForumEvents,
   queryForumEventsByEntity,
+  setUserRole,
 };
