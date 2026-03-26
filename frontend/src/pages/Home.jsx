@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Folder, MessageSquare, FileText, Clock, Plus, Share2, Copy, CheckCircle, X, ExternalLink, Globe, Shield } from 'lucide-react';
+import { Folder, MessageSquare, FileText, Clock, Plus, Share2, Copy, CheckCircle, X, ExternalLink, Globe, Shield, AlertCircle } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { useIdentity } from '../hooks/useIdentity';
 import { api } from '../api/endpoints';
@@ -66,6 +66,35 @@ export default function Home() {
   }
 
   const list = Array.isArray(categories) ? categories : categories?.categories || categories?.data || [];
+  const moveNotDeployed = forumInfo && !forumInfo.moveMode;
+
+  // Smart contract not deployed — block everything
+  if (moveNotDeployed) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-6 max-w-lg mx-auto text-center">
+        <div className="p-4 rounded-full" style={{ backgroundColor: 'rgba(255,170,0,0.15)' }}>
+          <AlertCircle size={48} style={{ color: 'var(--color-warning)' }} />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+            Smart Contract non deployato
+          </h2>
+          <p style={{ color: 'var(--color-text-muted)' }}>
+            Per usare il forum devi prima deployare lo smart contract Move sulla blockchain IOTA.
+          </p>
+        </div>
+        <div className="glass-card p-4 rounded-xl w-full text-left" style={{ borderRadius: 'var(--border-radius)' }}>
+          <p className="text-sm font-medium mb-2">Esegui nel terminale:</p>
+          <code className="block p-3 rounded-lg text-sm font-mono" style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-primary)' }}>
+            npm run move:deploy
+          </code>
+          <p className="text-xs mt-2" style={{ color: 'var(--color-text-muted)' }}>
+            Poi riavvia il server con <code style={{ color: 'var(--color-text)' }}>npm run dev</code>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (list.length === 0) {
     return (

@@ -71,11 +71,23 @@ module.exports = {
         };
       }
 
-      // 4. Reset iota.js runtime state so it picks up the new mnemonic
+      // 4. Clear Move contract IDs (new wallet = need to re-deploy)
+      try {
+        let content = fs.readFileSync(CONFIG_PATH, 'utf8');
+        content = content.replace(/FORUM_PACKAGE_ID:\s*'[^']*'/, "FORUM_PACKAGE_ID: null");
+        content = content.replace(/FORUM_OBJECT_ID:\s*'[^']*'/, "FORUM_OBJECT_ID: null");
+        content = content.replace(/ADMIN_CAP_ID:\s*'[^']*'/, "ADMIN_CAP_ID: null");
+        fs.writeFileSync(CONFIG_PATH, content, 'utf8');
+        console.log('[full-reset] Move contract IDs cleared — run `npm run move:deploy` to re-deploy');
+      } catch (e) {
+        console.log('[full-reset] Move config clear warning:', e.message);
+      }
+
+      // 5. Reset iota.js runtime state so it picks up the new mnemonic
       iota._resetRuntime();
       console.log('[full-reset] IOTA runtime reset');
 
-      // 5. Re-initialize wallet (request faucet funds) and wait for them
+      // 6. Re-initialize wallet (request faucet funds) and wait for them
       try {
         const walletResult = await iota.getOrInitWallet();
         console.log('[full-reset] New wallet initialized:', walletResult.address);
@@ -92,7 +104,7 @@ module.exports = {
         console.log('[full-reset] Wallet re-init warning:', e.message);
       }
 
-      // 6. Generate new RSA keypair for the server
+      // 7. Generate new RSA keypair for the server
       const CryptHelper = require('../utility/CryptHelper');
       const { publicKey, privateKey } = await CryptHelper.RSAGenerateKeyPair();
       try {
@@ -126,7 +138,8 @@ module.exports = {
       return {
         success: true,
         newAddress,
-        message: 'Full reset complete. New wallet generated. Restart server for full effect.',
+        needsMoveDeploy: true,
+        message: 'Full reset complete. New wallet generated. Run `npm run move:deploy` to deploy a new smart contract, then restart the server.',
       };
     } catch (err) {
       console.error('[full-reset] Error:', err.message, err.stack);

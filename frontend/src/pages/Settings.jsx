@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   RotateCcw, Trash2, Database, HardDrive, User,
   AlertTriangle, CheckCircle, Loader2, Download, Bug,
+  ExternalLink, Shield, AlertCircle,
 } from 'lucide-react';
 import { useIdentity } from '../hooks/useIdentity';
 import { useToast } from '../components/Layout';
@@ -52,6 +53,11 @@ export default function Settings() {
   const [confirmReset, setConfirmReset] = useState(null);
   const [doubleConfirm, setDoubleConfirm] = useState(false);
   const [logs, setLogs] = useState([]);
+  const [forumInfo, setForumInfo] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/v1/forum-info').then(r => r.json()).then(setForumInfo).catch(() => {});
+  }, []);
 
   const addLog = (msg, type = 'info') => {
     const ts = new Date().toLocaleTimeString();
@@ -209,6 +215,62 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* Smart Contract */}
+      <div className="glass-card p-6 rounded-xl" style={{ borderRadius: 'var(--border-radius)' }}>
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <Shield size={20} style={{ color: 'var(--color-primary)' }} />
+          Smart Contract Move
+        </h2>
+        {forumInfo?.moveMode ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+              <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--color-surface)' }}>
+                <span className="text-xs block mb-1" style={{ color: 'var(--color-text-muted)' }}>Package ID</span>
+                <code className="text-xs font-mono break-all" style={{ color: 'var(--color-primary)' }}>
+                  {forumInfo.packageId}
+                </code>
+              </div>
+              <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--color-surface)' }}>
+                <span className="text-xs block mb-1" style={{ color: 'var(--color-text-muted)' }}>Forum Object ID</span>
+                <code className="text-xs font-mono break-all" style={{ color: 'var(--color-primary)' }}>
+                  {forumInfo.forumObjectId}
+                </code>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              <span className="flex items-center gap-1">
+                <CheckCircle size={14} style={{ color: 'var(--color-success)' }} />
+                Contratto attivo su <strong style={{ color: 'var(--color-text)' }}>{forumInfo.network}</strong>
+              </span>
+              {forumInfo.explorerUrl && forumInfo.packageId && (
+                <a
+                  href={`${forumInfo.explorerUrl}/object/${forumInfo.packageId}?network=${forumInfo.network}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 ml-auto"
+                  style={{ color: 'var(--color-primary)' }}
+                >
+                  <ExternalLink size={12} />
+                  Vedi su Explorer
+                </a>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 p-4 rounded-lg" style={{ backgroundColor: 'rgba(255,170,0,0.1)' }}>
+            <AlertCircle size={20} style={{ color: 'var(--color-warning)' }} />
+            <div>
+              <p className="text-sm font-medium" style={{ color: 'var(--color-warning)' }}>
+                Contratto non deployato
+              </p>
+              <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                Esegui <code style={{ color: 'var(--color-text)' }}>npm run move:deploy</code> per deployare lo smart contract e abilitare il forum.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Azioni */}
       <div className="space-y-4">
         <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -265,7 +327,7 @@ export default function Settings() {
         <ActionCard
           icon={Trash2}
           title="Reset totale"
-          description="Genera un NUOVO wallet IOTA (nuovo indirizzo), nuove chiavi RSA server, svuota tutto. Il forum riparte completamente da zero. I vecchi dati on-chain restano sul vecchio indirizzo."
+          description="Genera un NUOVO wallet IOTA (nuovo indirizzo), nuove chiavi RSA server, svuota tutto. Dovrai ri-deployare lo smart contract con `npm run move:deploy`. I vecchi dati on-chain restano sul vecchio contratto."
           buttonText="Reset Totale"
           danger
           onAction={() => setConfirmReset('full')}
