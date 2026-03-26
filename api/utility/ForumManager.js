@@ -430,22 +430,27 @@ class ForumManager {
     const existing = User.findOne({ id: data.id });
 
     if (existing) {
+      // Preserve role if not explicitly set in data (sync doesn't carry roles)
       User.update(data.id, {
         username: data.username,
         bio: data.bio,
         avatar: data.avatar,
         publicKey: data.publicKey,
-        role: data.role || 'user',
+        role: data.role || existing.role || 'user',
         updatedAt: data.updatedAt || Date.now(),
       });
     } else {
+      // First user in empty DB becomes admin
+      const allUsers = User.findAll({});
+      const isFirstUser = !allUsers || allUsers.length === 0;
+
       User.create({
         id: data.id,
         username: data.username,
         bio: data.bio || null,
         avatar: data.avatar || null,
         publicKey: data.publicKey,
-        role: data.role || 'user',
+        role: data.role || (isFirstUser ? 'admin' : 'user'),
         createdAt: data.createdAt || Date.now(),
         updatedAt: data.updatedAt || Date.now(),
       });
