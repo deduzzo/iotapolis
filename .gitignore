@@ -7,3 +7,4 @@ config/private_iota_conf.js
 config/private_arweave_conf.js
 *.db
 .idea/
+move/forum/build/
