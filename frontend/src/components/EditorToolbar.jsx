@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import ImageInsertPopover from './ImageInsertPopover';
 import EmojiPickerPopover from './EmojiPickerPopover';
+import { useTranslation } from 'react-i18next';
 
 function ToolbarButton({ icon: Icon, label, isActive, onClick, disabled }) {
   return (
@@ -40,6 +41,7 @@ function Separator() {
 }
 
 export default function EditorToolbar({ editor }) {
+  const { t } = useTranslation();
   const [showImagePopover, setShowImagePopover] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const imageRef = useRef(null);
