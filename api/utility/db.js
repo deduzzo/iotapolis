@@ -385,24 +385,8 @@ function getThreadDetail(threadId) {
     ORDER BY p.createdAt ASC
   `).all(threadId);
 
-  // Nest posts by parentId
-  const postMap = new Map();
-  const rootPosts = [];
-
-  for (const post of posts) {
-    post.children = [];
-    postMap.set(post.id, post);
-  }
-
-  for (const post of posts) {
-    if (post.parentId && postMap.has(post.parentId)) {
-      postMap.get(post.parentId).children.push(post);
-    } else {
-      rootPosts.push(post);
-    }
-  }
-
-  return { ...thread, posts: rootPosts };
+  // Return flat list — frontend NestedReplies handles nesting by parentId
+  return { ...thread, posts };
 }
 
 // ---------------------------------------------------------------------------
