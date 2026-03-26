@@ -23,9 +23,12 @@ autoUpdater.autoInstallOnAppQuit = true;
 
 function sendUpdateEvent(event, data = {}) {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.executeJavaScript(
-      `window.dispatchEvent(new CustomEvent('electron-update', { detail: ${JSON.stringify({ event, ...data })} }))`
-    );
+    const payload = JSON.stringify({ event, ...data });
+    // Store on window so React can read it even if listener wasn't mounted yet
+    mainWindow.webContents.executeJavaScript(`
+      window.__latestUpdateEvent = ${payload};
+      window.dispatchEvent(new CustomEvent('electron-update', { detail: ${payload} }));
+    `);
   }
 }
 

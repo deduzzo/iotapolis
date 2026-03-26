@@ -23,6 +23,16 @@ export default function UpdateNotifier() {
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
+    // Check if an update event arrived before React mounted
+    if (window.__latestUpdateEvent) {
+      const data = window.__latestUpdateEvent;
+      if (data.event === 'available') {
+        setState('available');
+        setUpdateInfo(data);
+      }
+      window.__latestUpdateEvent = null;
+    }
+
     function handleUpdate(e) {
       const data = e.detail;
       switch (data.event) {
