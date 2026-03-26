@@ -113,7 +113,9 @@ function initDb() {
       action TEXT NOT NULL,
       reason TEXT,
       moderatorId TEXT NOT NULL,
-      createdAt INTEGER
+      entityType TEXT DEFAULT 'post',
+      createdAt INTEGER,
+      updatedAt INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS config (

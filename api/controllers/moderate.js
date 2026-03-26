@@ -104,10 +104,10 @@ module.exports = {
 
       // Broadcast
       await sails.helpers.broadcastEvent('dataChanged', {
-        action: 'postModerated',
+        action: 'moderated',
         label: inputs.action,
-        postId: inputs.postId,
-        threadId: post.threadId,
+        entityId,
+        entityType,
       });
 
       return {
