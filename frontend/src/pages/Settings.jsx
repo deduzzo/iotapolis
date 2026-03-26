@@ -116,9 +116,11 @@ export default function Settings() {
   };
 
   // Full reset: new wallet + clear DB + clear browser
+  // Modal stays open with loading spinner during this operation
   const fullReset = async () => {
     setLoading(l => ({ ...l, full: true }));
     addLog('Starting FULL reset (new wallet + clear everything)...');
+    console.log('[Settings] Full reset started...');
 
     // 1. Server-side full reset (new mnemonic, new wallet, clear DB, new RSA keys)
     try {
@@ -280,7 +282,7 @@ export default function Settings() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <div className="absolute inset-0 bg-black/60" onClick={() => { setConfirmReset(null); setDoubleConfirm(false); }} />
+            <div className="absolute inset-0 bg-black/60" onClick={loading.full ? undefined : () => { setConfirmReset(null); setDoubleConfirm(false); }} />
             <motion.div
               className="glass-card relative p-6 rounded-xl max-w-md mx-4"
               initial={{ scale: 0.9, opacity: 0 }}
@@ -288,71 +290,83 @@ export default function Settings() {
               exit={{ scale: 0.9, opacity: 0 }}
               style={{ borderRadius: 'var(--border-radius)' }}
             >
-              <div className="flex items-center gap-3 mb-4">
-                <AlertTriangle size={24} style={{ color: 'var(--color-danger)' }} />
-                <h3 className="text-lg font-bold">
-                  {confirmReset === 'full' && doubleConfirm ? 'Ultima conferma' : 'Conferma'}
-                </h3>
-              </div>
-
-              {confirmReset === 'identity' && (
-                <p className="mb-6" style={{ color: 'var(--color-text-muted)' }}>
-                  Sei sicuro di voler cancellare la tua identita locale? Se non hai un backup, perderai l'accesso al tuo account.
-                </p>
-              )}
-
-              {confirmReset === 'full' && !doubleConfirm && (
-                <div className="mb-6 space-y-3">
-                  <p style={{ color: 'var(--color-danger)' }} className="font-semibold">
-                    Operazione distruttiva e irreversibile!
-                  </p>
-                  <p style={{ color: 'var(--color-text-muted)' }}>
-                    Questo genera un <strong style={{ color: 'var(--color-text)' }}>nuovo wallet IOTA</strong> con un nuovo indirizzo.
-                    Tutti i dati locali verranno cancellati. Il forum riparte completamente da zero.
-                  </p>
-                  <p style={{ color: 'var(--color-text-muted)' }}>
-                    I vecchi dati on-chain restano sulla blockchain al vecchio indirizzo, ma non saranno piu associati a questa istanza.
+              {/* State: resetting in progress */}
+              {loading.full ? (
+                <div className="text-center py-4">
+                  <Loader2 size={40} className="animate-spin mx-auto mb-4" style={{ color: 'var(--color-primary)' }} />
+                  <h3 className="text-lg font-bold mb-2">Reset in corso...</h3>
+                  <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                    Generazione nuovo wallet, richiesta fondi dal faucet, pulizia database. Non chiudere questa pagina.
                   </p>
                 </div>
-              )}
+              ) : (
+                <>
+                  <div className="flex items-center gap-3 mb-4">
+                    <AlertTriangle size={24} style={{ color: 'var(--color-danger)' }} />
+                    <h3 className="text-lg font-bold">
+                      {confirmReset === 'full' && doubleConfirm ? 'Ultima conferma' : 'Conferma'}
+                    </h3>
+                  </div>
 
-              {confirmReset === 'full' && doubleConfirm && (
-                <div className="mb-6 space-y-3">
-                  <p style={{ color: 'var(--color-danger)' }} className="font-bold text-lg">
-                    Sei davvero sicuro?
-                  </p>
-                  <p style={{ color: 'var(--color-text-muted)' }}>
-                    Non potrai annullare questa operazione. Il vecchio wallet e tutti i dati locali andranno persi definitivamente.
-                    Assicurati di aver esportato tutto cio che ti serve.
-                  </p>
-                </div>
-              )}
+                  {confirmReset === 'identity' && (
+                    <p className="mb-6" style={{ color: 'var(--color-text-muted)' }}>
+                      Sei sicuro di voler cancellare la tua identita locale? Se non hai un backup, perderai l'accesso al tuo account.
+                    </p>
+                  )}
 
-              <div className="flex justify-end gap-3">
-                <button
-                  className="px-4 py-2 rounded-lg text-sm"
-                  style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', borderRadius: 'var(--border-radius)' }}
-                  onClick={() => { setConfirmReset(null); setDoubleConfirm(false); }}
-                >
-                  Annulla
-                </button>
-                <button
-                  className="px-4 py-2 rounded-lg text-sm font-medium"
-                  style={{ backgroundColor: 'var(--color-danger)', color: '#fff', borderRadius: 'var(--border-radius)' }}
-                  onClick={() => {
-                    if (confirmReset === 'identity') {
-                      resetIdentity();
-                    } else if (confirmReset === 'full' && !doubleConfirm) {
-                      setDoubleConfirm(true);
-                    } else if (confirmReset === 'full' && doubleConfirm) {
-                      setDoubleConfirm(false);
-                      fullReset();
-                    }
-                  }}
-                >
-                  {confirmReset === 'full' && !doubleConfirm ? 'Continua' : 'Conferma Reset Totale'}
-                </button>
-              </div>
+                  {confirmReset === 'full' && !doubleConfirm && (
+                    <div className="mb-6 space-y-3">
+                      <p style={{ color: 'var(--color-danger)' }} className="font-semibold">
+                        Operazione distruttiva e irreversibile!
+                      </p>
+                      <p style={{ color: 'var(--color-text-muted)' }}>
+                        Questo genera un <strong style={{ color: 'var(--color-text)' }}>nuovo wallet IOTA</strong> con un nuovo indirizzo.
+                        Tutti i dati locali verranno cancellati. Il forum riparte completamente da zero.
+                      </p>
+                      <p style={{ color: 'var(--color-text-muted)' }}>
+                        I vecchi dati on-chain restano sulla blockchain al vecchio indirizzo, ma non saranno piu associati a questa istanza.
+                      </p>
+                    </div>
+                  )}
+
+                  {confirmReset === 'full' && doubleConfirm && (
+                    <div className="mb-6 space-y-3">
+                      <p style={{ color: 'var(--color-danger)' }} className="font-bold text-lg">
+                        Sei davvero sicuro?
+                      </p>
+                      <p style={{ color: 'var(--color-text-muted)' }}>
+                        Non potrai annullare questa operazione. Il vecchio wallet e tutti i dati locali andranno persi definitivamente.
+                        Assicurati di aver esportato tutto cio che ti serve.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-3">
+                    <button
+                      className="px-4 py-2 rounded-lg text-sm"
+                      style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', borderRadius: 'var(--border-radius)' }}
+                      onClick={() => { setConfirmReset(null); setDoubleConfirm(false); }}
+                    >
+                      Annulla
+                    </button>
+                    <button
+                      className="px-4 py-2 rounded-lg text-sm font-medium"
+                      style={{ backgroundColor: 'var(--color-danger)', color: '#fff', borderRadius: 'var(--border-radius)' }}
+                      onClick={() => {
+                        if (confirmReset === 'identity') {
+                          resetIdentity();
+                        } else if (confirmReset === 'full' && !doubleConfirm) {
+                          setDoubleConfirm(true);
+                        } else if (confirmReset === 'full' && doubleConfirm) {
+                          fullReset();
+                        }
+                      }}
+                    >
+                      {confirmReset === 'identity' ? 'Conferma' : confirmReset === 'full' && !doubleConfirm ? 'Continua' : 'Conferma Reset Totale'}
+                    </button>
+                  </div>
+                </>
+              )}
             </motion.div>
           </motion.div>
         )}
