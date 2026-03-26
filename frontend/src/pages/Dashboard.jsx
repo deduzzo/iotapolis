@@ -6,6 +6,7 @@ import {
 import { useApi } from '../hooks/useApi';
 import { api } from '../api/endpoints';
 import StatsCard from '../components/StatsCard';
+import LoadTestPanel from '../components/LoadTestPanel';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 export default function Dashboard() {
@@ -37,14 +38,17 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <motion.h1
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-2xl md:text-3xl font-bold mb-6 neon-text"
-        style={{ fontFamily: 'var(--font-heading)' }}
-      >
-        Dashboard
-      </motion.h1>
+      <div className="flex items-center justify-between mb-6">
+        <motion.h1
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-2xl md:text-3xl font-bold neon-text"
+          style={{ fontFamily: 'var(--font-heading)' }}
+        >
+          Dashboard
+        </motion.h1>
+        <LoadTestPanel />
+      </div>
 
       {/* Stats grid */}
       <motion.div

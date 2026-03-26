@@ -47,6 +47,146 @@ function getNavItems(isAdmin) {
 
 /* ── Layout ────────────────────────────────────────────────────── */
 
+function SyncInfoButton({ isSynced, syncState, syncStatus }) {
+  const [showPanel, setShowPanel] = useState(false);
+  const [integrity, setIntegrity] = useState(null);
+  const [loadingIntegrity, setLoadingIntegrity] = useState(false);
+
+  async function fetchIntegrity() {
+    setLoadingIntegrity(true);
+    try {
+      const res = await fetch('/api/v1/integrity-check');
+      const data = await res.json();
+      setIntegrity(data);
+    } catch { setIntegrity(null); }
+    setLoadingIntegrity(false);
+  }
+
+  useEffect(() => {
+    if (showPanel) fetchIntegrity();
+  }, [showPanel]);
+
+  return (
+    <div className="relative">
+      <motion.button
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        onClick={() => setShowPanel(p => !p)}
+        className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg cursor-pointer"
+        style={{
+          color: isSynced ? 'var(--color-success)' : syncState === 'error' ? 'var(--color-danger)' : 'var(--color-warning)',
+          background: isSynced ? 'rgba(0,255,136,0.1)' : syncState === 'error' ? 'rgba(255,68,68,0.1)' : 'rgba(255,170,0,0.1)',
+        }}
+      >
+        {isSynced ? <Wifi size={14} /> : <WifiOff size={14} />}
+        <span className="hidden sm:inline">
+          {isSynced ? 'Synced' : syncState === 'syncing' ? 'Syncing...' : syncState === 'error' ? 'Error' : 'Idle'}
+        </span>
+      </motion.button>
+
+      {showPanel && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setShowPanel(false)} />
+          <motion.div
+            initial={{ opacity: 0, y: 8, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            className="absolute right-0 top-full mt-2 z-50 w-80 rounded-xl border p-4 text-xs shadow-lg"
+            style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: '0 10px 40px rgba(0,0,0,0.4)' }}
+          >
+            <h4 className="font-bold text-sm mb-3" style={{ color: 'var(--color-text)' }}>Stato Sincronizzazione</h4>
+
+            {/* Sync info */}
+            <div className="space-y-1.5 mb-3">
+              <div className="flex justify-between">
+                <span style={{ color: 'var(--color-text-muted)' }}>Status</span>
+                <span style={{ color: isSynced ? 'var(--color-success)' : 'var(--color-warning)' }}>
+                  {isSynced ? 'Sincronizzato' : syncState}
+                </span>
+              </div>
+              {syncStatus?.sync?.lastSync && (
+                <div className="flex justify-between">
+                  <span style={{ color: 'var(--color-text-muted)' }}>Ultima sync</span>
+                  <span style={{ color: 'var(--color-text)' }}>{new Date(syncStatus.sync.lastSync).toLocaleString()}</span>
+                </div>
+              )}
+              {syncStatus?.sync?.stats && (
+                <div className="flex justify-between">
+                  <span style={{ color: 'var(--color-text-muted)' }}>Sync stats</span>
+                  <span style={{ color: 'var(--color-text)' }}>
+                    U:{syncStatus.sync.stats.users} C:{syncStatus.sync.stats.categories} T:{syncStatus.sync.stats.threads} P:{syncStatus.sync.stats.posts} V:{syncStatus.sync.stats.votes}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Wallet */}
+            {syncStatus?.wallet && (
+              <div className="space-y-1.5 mb-3 pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                <div className="flex justify-between">
+                  <span style={{ color: 'var(--color-text-muted)' }}>Wallet</span>
+                  <span className="font-mono" style={{ color: 'var(--color-text)' }}>{syncStatus.wallet.address?.slice(0, 16)}...</span>
+                </div>
+                <div className="flex justify-between">
+                  <span style={{ color: 'var(--color-text-muted)' }}>Balance</span>
+                  <span className="font-mono" style={{ color: 'var(--color-primary)' }}>{syncStatus.wallet.balance}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span style={{ color: 'var(--color-text-muted)' }}>Network</span>
+                  <span style={{ color: 'var(--color-text)' }}>{syncStatus.wallet.network}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Integrity check */}
+            <div className="pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
+              <h5 className="font-bold mb-2" style={{ color: 'var(--color-text)' }}>Integrity Check (DB vs Blockchain)</h5>
+              {loadingIntegrity && <span style={{ color: 'var(--color-text-muted)' }}>Verificando...</span>}
+              {integrity && !loadingIntegrity && (
+                <div className="space-y-1">
+                  <div className="flex justify-between">
+                    <span style={{ color: 'var(--color-text-muted)' }}>Stato</span>
+                    <span style={{ color: integrity.synced ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                      {integrity.synced ? 'IN SYNC' : 'MISMATCH'}
+                    </span>
+                  </div>
+                  {integrity.local && (
+                    <>
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--color-text-muted)' }}>DB locale</span>
+                        <span style={{ color: 'var(--color-text)' }}>
+                          U:{integrity.local.users} C:{integrity.local.categories} T:{integrity.local.threads} P:{integrity.local.posts} V:{integrity.local.votes}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--color-text-muted)' }}>Blockchain</span>
+                        <span style={{ color: 'var(--color-text)' }}>
+                          U:{integrity.chain.users} C:{integrity.chain.categories} T:{integrity.chain.threads} P:{integrity.chain.posts} V:{integrity.chain.votes}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  {integrity.mismatches?.map((m, i) => (
+                    <div key={i} className="px-2 py-1 rounded" style={{ background: 'rgba(255,68,68,0.1)', color: 'var(--color-danger)' }}>
+                      {m.entity}: locale={m.local} chain={m.chain} (diff: {m.diff > 0 ? '+' : ''}{m.diff})
+                    </div>
+                  ))}
+                  <button
+                    onClick={fetchIntegrity}
+                    className="mt-1 text-[10px] underline"
+                    style={{ color: 'var(--color-primary)' }}
+                  >
+                    Ricontrolla
+                  </button>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function Layout() {
   const { forumName } = useTheme();
   const { identity } = useIdentity();
@@ -270,24 +410,11 @@ export default function Layout() {
                 </motion.div>
               )}
               {syncState && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg"
-                  style={{
-                    color: isSynced ? 'var(--color-success)'
-                      : syncState === 'error' ? 'var(--color-danger)'
-                      : 'var(--color-warning)',
-                    background: isSynced ? 'rgba(0,255,136,0.1)'
-                      : syncState === 'error' ? 'rgba(255,68,68,0.1)'
-                      : 'rgba(255,170,0,0.1)',
-                  }}
-                >
-                  {isSynced ? <Wifi size={14} /> : <WifiOff size={14} />}
-                  <span className="hidden sm:inline">
-                    {isSynced ? 'Synced' : syncState === 'syncing' ? 'Syncing...' : syncState === 'error' ? 'Error' : 'Idle'}
-                  </span>
-                </motion.div>
+                <SyncInfoButton
+                  isSynced={isSynced}
+                  syncState={syncState}
+                  syncStatus={syncStatus}
+                />
               )}
 
               {/* Identity badge + role */}
