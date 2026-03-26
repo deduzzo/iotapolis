@@ -1,8 +1,13 @@
 {
   "name": "iota-free-forum",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Decentralized forum on IOTA 2.0 blockchain",
-  "keywords": ["iota", "blockchain", "forum", "decentralized"],
+  "keywords": [
+    "iota",
+    "blockchain",
+    "forum",
+    "decentralized"
+  ],
   "private": true,
   "main": "app.js",
   "scripts": {
