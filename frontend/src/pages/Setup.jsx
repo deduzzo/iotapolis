@@ -203,16 +203,16 @@ export default function Setup() {
               </h3>
               <div className="space-y-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
                 <p>
-                  <strong style={{ color: 'var(--color-text)' }}>Ogni forum ha un wallet IOTA.</strong> Tutte le transazioni (post, thread, voti, utenti) sono pubblicate on-chain da quel wallet.
+                  <strong style={{ color: 'var(--color-text)' }}>Ogni forum ha un wallet server.</strong> Il wallet del server serve solo per inviare gas (faucet) ai nuovi utenti su testnet.
                 </p>
                 <p>
-                  <strong style={{ color: 'var(--color-text)' }}>Per leggere</strong> basta l'indirizzo pubblico del wallet. Chiunque puo scaricare e verificare tutti i dati.
+                  <strong style={{ color: 'var(--color-text)' }}>Ogni utente ha il proprio wallet IOTA</strong> (Ed25519) e firma le transazioni direttamente sulla blockchain.
                 </p>
                 <p>
-                  <strong style={{ color: 'var(--color-text)' }}>Per scrivere</strong> ogni utente firma i propri post con la propria chiave RSA. Il server con la chiave privata del wallet pubblica le transazioni on-chain.
+                  <strong style={{ color: 'var(--color-text)' }}>Per leggere</strong> basta la connection string. Chiunque puo scaricare e verificare tutti i dati.
                 </p>
                 <p>
-                  <strong style={{ color: 'var(--color-text)' }}>Nessuno puo falsificare</strong> i post di un altro utente — ogni post e firmato crittograficamente dall'autore.
+                  <strong style={{ color: 'var(--color-text)' }}>Nessuno puo falsificare</strong> i post di un altro utente — ogni transazione e firmata dal wallet dell'autore e verificata dai validatori IOTA.
                 </p>
               </div>
             </div>
@@ -309,15 +309,15 @@ export default function Setup() {
             <div
               className="p-4 rounded-xl border text-sm"
               style={{
-                borderColor: 'var(--color-warning)',
-                backgroundColor: 'rgba(255,170,0,0.05)',
+                borderColor: 'var(--color-primary)',
+                backgroundColor: 'rgba(0,240,255,0.05)',
                 color: 'var(--color-text-muted)',
                 borderRadius: 'var(--border-radius)',
               }}
             >
-              <strong style={{ color: 'var(--color-warning)' }}>Importante:</strong> La chiave privata del wallet (mnemonic) e in{' '}
-              <code className="text-xs" style={{ color: 'var(--color-text)' }}>config/private_iota_conf.js</code>.
-              Non condividerla mai. Chi possiede la chiave privata controlla la pubblicazione on-chain.
+              <strong style={{ color: 'var(--color-primary)' }}>Nota:</strong> Il wallet server in{' '}
+              <code className="text-xs" style={{ color: 'var(--color-text)' }}>config/private_iota_conf.js</code>{' '}
+              serve solo per il faucet (invio gas ai nuovi utenti). Non controlla la pubblicazione — ogni utente firma con il proprio wallet.
             </div>
 
             <button

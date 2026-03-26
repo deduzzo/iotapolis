@@ -1,96 +1,41 @@
-const db = require('../utility/db');
-const ForumTags = require('../enums/ForumTags');
+/**
+ * edit-category.js — DEPRECATED
+ *
+ * Category editing now happens on-chain. Admins call
+ * mod_post_event(FORUM_CATEGORY, ...) with an incremented version
+ * directly on the Move smart contract.
+ * The backend detects updates via blockchain event polling.
+ */
 
 module.exports = {
-  friendlyName: 'Edit category',
-  description: 'Edit an existing category (admin only, creates a new version on-chain).',
+  friendlyName: 'Edit category (Deprecated)',
+  description: 'Category editing is now on-chain. This endpoint returns a deprecation notice.',
 
   inputs: {
-    name: { type: 'string', required: true },
+    name: { type: 'string' },
     description: { type: 'string', allowNull: true },
     sortOrder: { type: 'number', allowNull: true },
-    authorId: { type: 'string', required: true },
-    nonce: { type: 'string', required: true },
-    version: { type: 'number', required: true },
-    createdAt: { type: 'number', required: true },
-    publicKey: { type: 'string', required: true },
-    signature: { type: 'string', required: true },
+    authorId: { type: 'string' },
+    nonce: { type: 'string' },
+    version: { type: 'number' },
+    createdAt: { type: 'number' },
+    publicKey: { type: 'string' },
+    signature: { type: 'string' },
   },
 
   exits: {
     success: { statusCode: 200 },
-    forbidden: { statusCode: 403 },
-    notFound: { statusCode: 404 },
+    gone: { statusCode: 410 },
   },
 
-  fn: async function (inputs) {
-    try {
-      const { userId } = await sails.helpers.verifySignature(this.req.body);
-      const categoryId = this.req.params.id;
-
-      if (userId !== inputs.authorId) {
-        this.res.status(403);
-        return { success: false, error: 'Author mismatch' };
-      }
-
-      // Check admin
-      const Users = db.getModel('users');
-      const user = Users.findOne({ id: userId });
-      if (!user || user.role !== 'admin') {
-        throw 'forbidden';
-      }
-
-      // Check category exists
-      const Categories = db.getModel('categories');
-      const category = Categories.findOne({ id: categoryId });
-      if (!category) {
-        throw 'notFound';
-      }
-
-      const newVersion = inputs.version;
-
-      // Publish to blockchain
-      const ForumManager = require('../utility/ForumManager');
-      const txResult = await ForumManager.publishToChain(ForumTags.FORUM_CATEGORY, categoryId, {
-        id: categoryId,
-        name: inputs.name,
-        description: inputs.description || null,
-        authorId: userId,
-        nonce: inputs.nonce,
-        version: newVersion,
-        createdAt: inputs.createdAt,
-      });
-
-      // Update cache
-      const updateData = {
-        name: inputs.name,
-        description: inputs.description !== undefined ? inputs.description : category.description,
-      };
-      if (inputs.sortOrder !== null && inputs.sortOrder !== undefined) {
-        updateData.sortOrder = inputs.sortOrder;
-      }
-      const updated = Categories.update(categoryId, updateData);
-
-      // Broadcast
-      await sails.helpers.broadcastEvent('dataChanged', {
-        entity: 'category',
-        action: 'categoryEdited',
-        label: inputs.name,
-        categoryId,
-        version: newVersion,
-      });
-
-      return {
-        success: true,
-        category: updated,
-        digest: txResult?.digest || null,
-      };
-    } catch (err) {
-      if (err === 'forbidden') throw 'forbidden';
-      if (err === 'notFound') throw 'notFound';
-      sails.log.error('[edit-category]', err.message || err);
-      this.res.status(err.message?.includes('signature') || err.message?.includes('nonce') ? 400 : 500);
-      return { success: false, error: err.message || String(err) };
-    }
+  fn: async function () {
+    this.res.status(410);
+    return {
+      success: false,
+      error: 'Category edit endpoint deprecated. Admins now call mod_post_event(FORUM_CATEGORY, ...) with incremented version directly on the IOTA blockchain.',
+      migration: {
+        action: 'Use IOTA SDK to call forum::mod_post_event() with FORUM_CATEGORY tag',
+      },
+    };
   },
 };

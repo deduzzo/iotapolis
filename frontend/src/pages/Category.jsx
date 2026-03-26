@@ -91,10 +91,17 @@ export default function Category() {
             }
           });
         }
+
+        // Utente aggiornato (es. cambio showUsername) — refresh thread list per aggiornare nomi
+        if (wsData.entity === 'user' && wsData.action === 'userUpdated') {
+          api.getThreads(id, page).then((fresh) => {
+            if (fresh) setData(fresh);
+          });
+        }
       },
       [id, page, setData, markThreadFresh],
     ),
-    ['post', 'thread'],
+    ['post', 'thread', 'user'],
   );
 
   const threads = Array.isArray(data) ? data : data?.threads || data?.data || [];

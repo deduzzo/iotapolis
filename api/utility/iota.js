@@ -1178,7 +1178,33 @@ async function queryForumEvents(remotePackageId = null) {
     for (const ev of result.data) {
       try {
         const parsed = ev.parsedJson;
-        if (!parsed || !parsed.tag) continue;
+        sails.log.info(`[iota] RAW EVENT parsedJson keys: ${Object.keys(parsed || {}).join(',')} | tag=${parsed?.tag} | author=${parsed?.author} | entity_id=${parsed?.entity_id} | version=${parsed?.version}`);
+        if (!parsed || !parsed.tag) {
+          // Handle RoleChanged events (emitted by set_user_role, different struct)
+          if (parsed?.new_role !== undefined && parsed?.user) {
+            sails.log.info(`[iota] RoleChanged event: user=${parsed.user} new_role=${parsed.new_role} changed_by=${parsed.changed_by}`);
+            const roleNames = { 0: 'banned', 1: 'user', 2: 'moderator', 3: 'admin' };
+            if (!byTag['ROLE_CHANGED']) byTag['ROLE_CHANGED'] = [];
+            byTag['ROLE_CHANGED'].push({
+              payload: {
+                targetUserId: parsed.user,
+                role: roleNames[parsed.new_role] || 'user',
+                oldRole: roleNames[parsed.old_role] || 'user',
+                grantedBy: parsed.changed_by,
+              },
+              version: 1,
+              timestamp: parsed.timestamp ? Number(parsed.timestamp) : null,
+              digest: ev.id?.txDigest,
+              tag: 'ROLE_CHANGED',
+              entityId: parsed.user,
+              author: parsed.changed_by,
+            });
+            totalEvents++;
+          } else {
+            sails.log.warn(`[iota] Skipping unknown event. Keys: ${Object.keys(parsed || {}).join(',')}`);
+          }
+          continue;
+        }
 
         const tag = parsed.tag;
         // Decode gzipped data
@@ -1188,13 +1214,15 @@ async function queryForumEvents(remotePackageId = null) {
           const dataBytes = Buffer.from(parsed.data);
           const jsonStr = zlib.gunzipSync(dataBytes).toString('utf8');
           payload = JSON.parse(jsonStr);
+          sails.log.info(`[iota] DECODED payload for ${tag}: ${JSON.stringify(payload).substring(0, 300)}`);
         } catch (decErr) {
+          sails.log.warn(`[iota] Gzip decode failed for ${tag}: ${decErr.message}, trying fallback`);
           // Fallback: data might be uncompressed JSON string
           payload = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
+          sails.log.info(`[iota] FALLBACK payload for ${tag}: ${JSON.stringify(payload).substring(0, 300)}`);
         }
 
-        if (!byTag[tag]) byTag[tag] = [];
-        byTag[tag].push({
+        const record = {
           payload,
           version: parsed.version ? Number(parsed.version) : 1,
           timestamp: parsed.timestamp ? Number(parsed.timestamp) : null,
@@ -1202,10 +1230,15 @@ async function queryForumEvents(remotePackageId = null) {
           tag,
           entityId: parsed.entity_id,
           author: parsed.author,
-        });
+        };
+        sails.log.info(`[iota] RECORD: tag=${record.tag} author=${record.author} entityId=${record.entityId} digest=${record.digest}`);
+
+        if (!byTag[tag]) byTag[tag] = [];
+        byTag[tag].push(record);
         totalEvents++;
       } catch (err) {
         sails.log.warn(`[iota] queryForumEvents: error decoding event:`, err.message);
+        sails.log.warn(`[iota] Full event dump: ${JSON.stringify(ev).substring(0, 500)}`);
       }
     }
 

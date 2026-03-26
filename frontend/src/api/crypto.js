@@ -1,18 +1,193 @@
 /**
- * Client-side cryptography using the Web Crypto API.
- * Provides RSA signing/verification, AES-256-CBC encryption, and RSA-OAEP encryption.
+ * Client-side cryptography for IOTA Free Forum.
+ *
+ * Primary identity: IOTA Ed25519 keypair derived from BIP39 mnemonic.
+ * Mnemonic encrypted with AES-256-GCM (password-based) for localStorage.
+ *
+ * Retained from legacy:
+ *   - AES-256-CBC encrypt/decrypt (paid content encryption)
+ *   - RSA-OAEP encrypt/decrypt (key exchange for paid content)
  */
 
-const SIGN_ALGO = {
-  name: 'RSASSA-PKCS1-v1_5',
-  modulusLength: 2048,
-  publicExponent: new Uint8Array([1, 0, 1]),
-  hash: 'SHA-256',
-};
+import { Ed25519Keypair } from '@iota/iota-sdk/keypairs/ed25519';
+import { IotaClient, getFullnodeUrl } from '@iota/iota-sdk/client';
+import { Transaction } from '@iota/iota-sdk/transactions';
+import { generateMnemonic as _genMnemonic, validateMnemonic } from '@scure/bip39';
+import { wordlist } from '@scure/bip39/wordlists/english.js';
 
-// ---------------------------------------------------------------------------
-// Helpers: PEM <-> ArrayBuffer <-> CryptoKey
-// ---------------------------------------------------------------------------
+// ─── IOTA Network Client (singleton) ────────────────────────────────────────
+
+let _client = null;
+let _networkUrl = null;
+
+/**
+ * Set the RPC endpoint URL for the IOTA client.
+ * Call this after fetching /api/v1/forum-info to use the correct network.
+ */
+export function setNetworkUrl(url) {
+  if (url && url !== _networkUrl) {
+    _networkUrl = url;
+    _client = new IotaClient({ url });
+  }
+}
+
+/**
+ * Configure the client from a network name (e.g. 'testnet', 'mainnet').
+ */
+export function setNetwork(network) {
+  const url = getFullnodeUrl(network);
+  setNetworkUrl(url);
+}
+
+/**
+ * Get the singleton IotaClient.
+ * Falls back to testnet if not yet configured.
+ */
+export function getClient() {
+  if (!_client) {
+    const url = _networkUrl || getFullnodeUrl('testnet');
+    _networkUrl = url;
+    _client = new IotaClient({ url });
+  }
+  return _client;
+}
+
+// Re-export for transaction building
+export { Transaction };
+
+// IOTA system clock shared object
+export const CLOCK_OBJECT_ID = '0x6';
+
+// ─── BIP39 Mnemonic ─────────────────────────────────────────────────────────
+
+/**
+ * Generate a 12-word BIP39 mnemonic.
+ */
+export function generateMnemonic() {
+  return _genMnemonic(wordlist, 128);
+}
+
+/**
+ * Validate a BIP39 mnemonic string.
+ */
+export function isValidMnemonic(mnemonic) {
+  if (!mnemonic || typeof mnemonic !== 'string') return false;
+  return validateMnemonic(mnemonic.trim(), wordlist);
+}
+
+// ─── Ed25519 Keypair ─────────────────────────────────────────────────────────
+
+/**
+ * Derive an Ed25519Keypair from a BIP39 mnemonic.
+ */
+export function keypairFromMnemonic(mnemonic) {
+  return Ed25519Keypair.deriveKeypair(mnemonic.trim());
+}
+
+/**
+ * Get the IOTA address (0x...) from a keypair.
+ */
+export function getAddress(keypair) {
+  return keypair.getPublicKey().toIotaAddress();
+}
+
+// ─── Mnemonic Encryption (AES-256-GCM, password-based) ──────────────────────
+
+/**
+ * Derive an AES-256-GCM key from a password + salt via PBKDF2 (600k rounds).
+ */
+async function deriveKeyFromPassword(password, salt) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveKey'],
+  );
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 600_000, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt'],
+  );
+}
+
+/**
+ * Encrypt mnemonic with a user password (AES-256-GCM).
+ * Returns a base64 string containing: salt(16) || iv(12) || ciphertext+tag.
+ */
+export async function encryptMnemonic(mnemonic, password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKeyFromPassword(password, salt);
+  const encoded = new TextEncoder().encode(mnemonic);
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    encoded,
+  );
+  const result = new Uint8Array(salt.length + iv.length + ciphertext.byteLength);
+  result.set(salt, 0);
+  result.set(iv, salt.length);
+  result.set(new Uint8Array(ciphertext), salt.length + iv.length);
+  return arrayBufferToBase64(result.buffer);
+}
+
+/**
+ * Decrypt mnemonic with user password (AES-256-GCM).
+ * Throws on wrong password.
+ */
+export async function decryptMnemonic(encryptedBase64, password) {
+  const data = new Uint8Array(base64ToArrayBuffer(encryptedBase64));
+  const salt = data.slice(0, 16);
+  const iv = data.slice(16, 28);
+  const ciphertext = data.slice(28);
+  const key = await deriveKeyFromPassword(password, salt);
+  try {
+    const plainBuffer = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      ciphertext,
+    );
+    return new TextDecoder().decode(plainBuffer);
+  } catch {
+    throw new Error('Wrong password or corrupted data');
+  }
+}
+
+// ─── Sign & Execute Transaction ──────────────────────────────────────────────
+
+/**
+ * Sign a Transaction with the user's Ed25519 keypair and execute on the IOTA network.
+ * Waits for confirmation before returning.
+ */
+export async function signAndExecuteTransaction(keypair, transactionBlock) {
+  const client = getClient();
+  const result = await client.signAndExecuteTransaction({
+    signer: keypair,
+    transaction: transactionBlock,
+    options: { showEffects: true, showEvents: true },
+  });
+  await client.waitForTransaction({ digest: result.digest });
+  return result;
+}
+
+// ─── Gzip compression (for on-chain data payloads) ──────────────────────────
+
+/**
+ * Gzip-compress a JSON-serialisable object.
+ * Returns Uint8Array suitable for passing as vector<u8> in Move calls.
+ */
+export async function gzipCompress(jsonObject) {
+  const jsonStr = JSON.stringify(jsonObject);
+  const stream = new Blob([jsonStr]).stream().pipeThrough(new CompressionStream('gzip'));
+  const blob = await new Response(stream).blob();
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+// ─── Helpers: base64 / PEM ──────────────────────────────────────────────────
 
 function arrayBufferToBase64(buffer) {
   const bytes = new Uint8Array(buffer);
@@ -33,122 +208,11 @@ function base64ToArrayBuffer(b64) {
 }
 
 function pemToArrayBuffer(pem) {
-  const b64 = pem
-    .replace(/-----[A-Z ]+-----/g, '')
-    .replace(/\s+/g, '');
+  const b64 = pem.replace(/-----[A-Z ]+-----/g, '').replace(/\s+/g, '');
   return base64ToArrayBuffer(b64);
 }
 
-function arrayBufferToPem(buffer, type) {
-  const b64 = arrayBufferToBase64(buffer);
-  const lines = b64.match(/.{1,64}/g).join('\n');
-  return `-----BEGIN ${type}-----\n${lines}\n-----END ${type}-----`;
-}
-
-async function importSignPrivateKey(pem) {
-  const der = pemToArrayBuffer(pem);
-  return crypto.subtle.importKey('pkcs8', der, SIGN_ALGO, false, ['sign']);
-}
-
-async function importSignPublicKey(pem) {
-  const der = pemToArrayBuffer(pem);
-  return crypto.subtle.importKey('spki', der, SIGN_ALGO, false, ['verify']);
-}
-
-async function importEncryptPublicKey(pem) {
-  const der = pemToArrayBuffer(pem);
-  return crypto.subtle.importKey(
-    'spki',
-    der,
-    { name: 'RSA-OAEP', hash: 'SHA-256' },
-    false,
-    ['encrypt'],
-  );
-}
-
-async function importEncryptPrivateKey(pem) {
-  const der = pemToArrayBuffer(pem);
-  return crypto.subtle.importKey(
-    'pkcs8',
-    der,
-    { name: 'RSA-OAEP', hash: 'SHA-256' },
-    false,
-    ['decrypt'],
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Keypair generation
-// ---------------------------------------------------------------------------
-
-/**
- * Generate an RSA-2048 keypair for signing (RSASSA-PKCS1-v1_5 / SHA-256).
- * Returns { publicKeyPem: string, privateKeyPem: string }
- */
-export async function generateKeypair() {
-  const keyPair = await crypto.subtle.generateKey(
-    SIGN_ALGO,
-    true, // extractable
-    ['sign', 'verify'],
-  );
-
-  const publicKeyDer = await crypto.subtle.exportKey('spki', keyPair.publicKey);
-  const privateKeyDer = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
-
-  return {
-    publicKeyPem: arrayBufferToPem(publicKeyDer, 'PUBLIC KEY'),
-    privateKeyPem: arrayBufferToPem(privateKeyDer, 'PRIVATE KEY'),
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Signing
-// ---------------------------------------------------------------------------
-
-/**
- * Sign a payload object with RSA-SHA256 (RSASSA-PKCS1-v1_5).
- * Removes the 'signature' field, sorts keys, stringifies, then signs.
- * Returns a base64-encoded signature string.
- */
-export async function signPayload(privateKeyPem, payload) {
-  // Remove signature field and sort keys deterministically
-  const cleaned = { ...payload };
-  delete cleaned.signature;
-  const sortedKeys = Object.keys(cleaned).sort();
-  const sorted = {};
-  for (const key of sortedKeys) {
-    sorted[key] = cleaned[key];
-  }
-  const message = JSON.stringify(sorted);
-
-  const key = await importSignPrivateKey(privateKeyPem);
-  const encoded = new TextEncoder().encode(message);
-  const signatureBuffer = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, encoded);
-
-  return arrayBufferToBase64(signatureBuffer);
-}
-
-// ---------------------------------------------------------------------------
-// User ID derivation
-// ---------------------------------------------------------------------------
-
-/**
- * Derive a user ID from a public key PEM.
- * SHA-256(publicKeyPem) -> first 16 hex chars uppercase -> prefix "USR_"
- */
-export async function deriveUserId(publicKeyPem) {
-  const encoded = new TextEncoder().encode(publicKeyPem);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', encoded);
-  const hashArray = new Uint8Array(hashBuffer);
-  const hex = Array.from(hashArray)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-  return `USR_${hex.slice(0, 16).toUpperCase()}`;
-}
-
-// ---------------------------------------------------------------------------
-// AES-256-CBC encryption / decryption
-// ---------------------------------------------------------------------------
+// ─── AES-256-CBC (for paid content encryption) ──────────────────────────────
 
 async function importAESKey(keyBase64) {
   const raw = base64ToArrayBuffer(keyBase64);
@@ -172,9 +236,8 @@ async function computeHMAC(keyBase64, data) {
 }
 
 /**
- * AES-256-CBC encrypt.
- * Generates a random 16-byte IV, encrypts, computes HMAC-SHA256 over IV+ciphertext.
- * Returns { iv: base64, ciphertext: base64, hmac: base64 }
+ * AES-256-CBC encrypt with HMAC-SHA256 integrity.
+ * Returns { iv, ciphertext, hmac } — all base64.
  */
 export async function encryptAES(plaintext, keyBase64) {
   const iv = crypto.getRandomValues(new Uint8Array(16));
@@ -190,7 +253,6 @@ export async function encryptAES(plaintext, keyBase64) {
   const ivB64 = arrayBufferToBase64(iv.buffer);
   const ciphertextB64 = arrayBufferToBase64(cipherBuffer);
 
-  // HMAC over IV + ciphertext (concatenated raw bytes)
   const combined = new Uint8Array(iv.byteLength + cipherBuffer.byteLength);
   combined.set(iv, 0);
   combined.set(new Uint8Array(cipherBuffer), iv.byteLength);
@@ -200,9 +262,7 @@ export async function encryptAES(plaintext, keyBase64) {
 }
 
 /**
- * AES-256-CBC decrypt.
- * Verifies HMAC before decrypting.
- * Throws on HMAC mismatch.
+ * AES-256-CBC decrypt. Verifies HMAC before decrypting.
  */
 export async function decryptAES(encrypted, keyBase64) {
   const { iv, ciphertext, hmac } = encrypted;
@@ -210,7 +270,6 @@ export async function decryptAES(encrypted, keyBase64) {
   const ivBytes = new Uint8Array(base64ToArrayBuffer(iv));
   const cipherBytes = new Uint8Array(base64ToArrayBuffer(ciphertext));
 
-  // Verify HMAC
   const combined = new Uint8Array(ivBytes.byteLength + cipherBytes.byteLength);
   combined.set(ivBytes, 0);
   combined.set(cipherBytes, ivBytes.byteLength);
@@ -230,14 +289,32 @@ export async function decryptAES(encrypted, keyBase64) {
   return new TextDecoder().decode(plainBuffer);
 }
 
-// ---------------------------------------------------------------------------
-// RSA-OAEP encryption / decryption (for key exchange)
-// ---------------------------------------------------------------------------
+// ─── RSA-OAEP (key exchange for paid content) ───────────────────────────────
+
+async function importEncryptPublicKey(pem) {
+  const der = pemToArrayBuffer(pem);
+  return crypto.subtle.importKey(
+    'spki',
+    der,
+    { name: 'RSA-OAEP', hash: 'SHA-256' },
+    false,
+    ['encrypt'],
+  );
+}
+
+async function importEncryptPrivateKey(pem) {
+  const der = pemToArrayBuffer(pem);
+  return crypto.subtle.importKey(
+    'pkcs8',
+    der,
+    { name: 'RSA-OAEP', hash: 'SHA-256' },
+    false,
+    ['decrypt'],
+  );
+}
 
 /**
  * RSA-OAEP encrypt a short string with a public key PEM.
- * Note: the public key PEM must be from an RSA-OAEP keypair, not the signing keypair.
- * Returns base64-encoded ciphertext.
  */
 export async function encryptRSA(data, publicKeyPem) {
   const key = await importEncryptPublicKey(publicKeyPem);
@@ -248,7 +325,6 @@ export async function encryptRSA(data, publicKeyPem) {
 
 /**
  * RSA-OAEP decrypt with a private key PEM.
- * Returns the decrypted string.
  */
 export async function decryptRSA(ciphertext, privateKeyPem) {
   const key = await importEncryptPrivateKey(privateKeyPem);

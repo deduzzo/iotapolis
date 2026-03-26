@@ -8,8 +8,8 @@
 <h1 align="center">IOTA Free Forum</h1>
 
 <p align="center">
-  <strong>A fully decentralized forum powered by IOTA 2.0 blockchain and Move smart contracts.</strong><br/>
-  Every post is on-chain. Every permission is verified by validators. No central authority. No censorship.
+  <strong>A fully decentralized forum with integrated payments, marketplace, and escrow — powered by IOTA 2.0 and Move smart contracts.</strong><br/>
+  Every post is on-chain. Every user signs with their own wallet. Every payment is trustless.
 </p>
 
 <p align="center">
@@ -17,6 +17,7 @@
   <a href="#-features">Features</a> &bull;
   <a href="#-architecture">Architecture</a> &bull;
   <a href="#-smart-contract">Smart Contract</a> &bull;
+  <a href="#-payments--marketplace">Payments</a> &bull;
   <a href="#-themes">Themes</a> &bull;
   <a href="#-multi-node">Multi-Node</a> &bull;
   <a href="#-contributing">Contributing</a>
@@ -28,11 +29,12 @@
 
 Traditional forums depend on a central server that can be shut down, censored, or compromised. **IOTA Free Forum** stores every piece of data on the IOTA 2.0 blockchain as Move smart contract events. The local server is just a cache — the blockchain is the source of truth.
 
+- **True decentralization** — Each user has their own IOTA wallet (Ed25519). The server never holds private keys
 - **No single point of failure** — Any node can reconstruct the entire forum from on-chain events
 - **Immutable history** — Every post, edit, and vote is permanently recorded with a transaction digest
-- **On-chain permissions** — Roles (User, Moderator, Admin) are enforced by the smart contract, not the server
-- **Cryptographic identity** — Users sign every action with their RSA-2048 keypair. No passwords, no accounts
-- **Zero fees on testnet** — IOTA 2.0 Rebased testnet provides free gas via faucet
+- **On-chain permissions** — Roles (User, Moderator, Admin) enforced by the smart contract, not the server
+- **Built-in economy** — Tips, subscriptions, paid content, badges, and escrow — all on-chain
+- **Zero fees on testnet** — IOTA 2.0 Rebased testnet provides free gas via automatic faucet
 
 ---
 
@@ -47,7 +49,7 @@ cd iota-free-forum
 npm install
 cd frontend && npm install && cd ..
 
-# First run — generates wallet + config
+# First run — generates server wallet + config
 npm run dev
 # Wait for "Sails lifted", then Ctrl+C
 
@@ -58,7 +60,7 @@ npm run move:deploy
 npm run dev
 ```
 
-Open `http://localhost:5173` — generate an identity, register a username, create your first category and start posting.
+Open `http://localhost:5173` — create a wallet, get gas from the faucet, register a username, and start posting.
 
 > See [DEPLOY.md](DEPLOY.md) for production deployment, custom networks, and advanced configuration.
 
@@ -66,34 +68,47 @@ Open `http://localhost:5173` — generate an identity, register a username, crea
 
 ## Features
 
-### Core
+### Core Forum
 
 | Feature | Description |
 |---------|-------------|
-| **On-chain posts** | Every thread, post, reply, vote, and edit is published as a Move event on IOTA 2.0 |
+| **On-chain posts** | Every thread, post, reply, vote, and edit is a Move event on IOTA 2.0 |
 | **Smart contract roles** | 4-level permission system (Banned/User/Moderator/Admin) enforced by validators |
-| **Cryptographic identity** | RSA-2048 keypair generated in-browser. No passwords. Export/import your identity as JSON |
-| **Signed actions** | Every API call is signed with RSASSA-PKCS1-v1_5 + SHA-256. The server verifies before publishing |
-| **Immutable versioning** | Edit history stored on-chain. Every version has a TX digest linkable on the IOTA Explorer |
+| **IOTA wallet identity** | Ed25519 keypair with BIP39 mnemonic. Password-encrypted in browser. No accounts needed |
+| **Direct signing** | Users sign transactions directly on the blockchain — the server never touches private keys |
+| **Immutable versioning** | Edit history stored on-chain. Every version has a TX digest on the IOTA Explorer |
 | **Nested replies** | Threaded discussions with unlimited depth nesting |
 | **Voting system** | Upvote/downvote posts. Scores computed from on-chain vote events |
 | **Full-text search** | SQLite FTS5 index rebuilt from blockchain data |
+| **8 languages** | IT, EN, ES, DE, FR, PT, JA, ZH with react-i18next |
 | **Connection string** | Share your forum with `testnet:PACKAGE_ID:FORUM_OBJECT_ID` — anyone can join |
+
+### Payments & Marketplace
+
+| Feature | Description |
+|---------|-------------|
+| **Tips** | Send IOTA directly to post authors. Preset amounts + custom. All on-chain |
+| **Subscriptions** | Tiered plans (Free/Pro/Premium) with configurable prices and durations |
+| **Paid content** | Authors set a price for threads. AES-256 encrypted, key delivered after payment |
+| **Premium categories** | Admin restricts category access to subscribers of a given tier |
+| **Badges** | Admin-configurable purchasable badges displayed next to usernames |
+| **Escrow (multi-sig)** | 2-of-3 escrow for services: buyer + seller + arbitrator. Funds locked on-chain |
+| **Reputation** | On-chain ratings (1-5 stars) after escrow resolution. Immutable trade history |
+| **Marketplace** | Browse paid content, services, and badges in a dedicated page |
+| **Treasury** | Forum collects fees (5% marketplace, 2% escrow) to a smart contract treasury |
 
 ### Editor
 
 | Feature | Description |
 |---------|-------------|
-| **Rich WYSIWYG editor** | Tiptap-based editor with full toolbar |
-| **Markdown output** | Always serializes to clean markdown via `tiptap-markdown` |
-| **Formatting** | Bold, italic, strikethrough, headings (H1-H3), blockquote, horizontal rule |
-| **Lists** | Bullet lists, numbered lists, checklists (task lists) |
+| **Rich WYSIWYG editor** | Tiptap-based with full toolbar |
+| **Markdown output** | Serializes to clean markdown via `tiptap-markdown` |
+| **Formatting** | Bold, italic, strikethrough, headings, blockquote, horizontal rule |
 | **Code** | Inline code + code blocks with syntax highlighting |
-| **Tables** | Insert and edit tables directly in the editor |
-| **Images** | Insert via URL with suggested free hosting (Imgur, ImgBB, Postimages) |
-| **Emoji** | Emoji picker powered by emoji-mart |
-| **@Mentions** | Type `@` to search and mention users |
-| **Undo/Redo** | Full history with Ctrl+Z / Ctrl+Y |
+| **Tables** | Insert and edit tables directly |
+| **Images** | Insert via URL |
+| **Emoji** | Emoji picker (emoji-mart) |
+| **@Mentions** | Search and mention users |
 
 ### Themes
 
@@ -105,13 +120,9 @@ Open `http://localhost:5173` — generate an identity, register a username, crea
 | **Clean Minimal** | Light, minimal, blue accent | Card grid |
 | **Dark Pro** | Dark, professional, green accent | Card grid |
 | **Retro Terminal** | Dark, monospace, green neon | Card grid |
-| **Invision Light** | Classic forum, white, blue accent, shadows | IPB table layout |
+| **Invision Light** | Classic forum, white, blue accent | IPB table layout |
 | **Invision Dark** | Classic forum, dark gray, blue accent | IPB table layout |
 | **Material Ocean** | Material Design, deep navy, teal accent | Card grid |
-
-- **Per-user theme** — Each user chooses their own theme in Settings (saved in localStorage)
-- **Admin default** — The admin sets the forum-wide default theme
-- **Customization** — Colors, fonts, border radius, glassmorphism, neon glow — all configurable
 
 ### Real-time Sync
 
@@ -119,20 +130,9 @@ Open `http://localhost:5173` — generate an identity, register a username, crea
 |---------|-------------|
 | **WebSocket updates** | Granular `dataChanged` events push updates to specific UI components |
 | **Optimistic UI** | Posts/votes appear instantly, confirmed asynchronously |
-| **Blockchain polling** | Every 30s polls for new on-chain events from other nodes |
-| **Cross-node sync** | Multiple servers on the same forum stay in sync via blockchain |
-| **Integrity check** | `GET /api/v1/integrity-check` compares local cache vs on-chain data |
-
-### Admin & Moderation
-
-| Feature | Description |
-|---------|-------------|
-| **Role management** | Promote/demote users (on-chain, enforced by smart contract) |
-| **Content moderation** | Hide/unhide posts and threads |
-| **Thread controls** | Pin, lock, hide threads |
-| **Category management** | Create and edit categories |
-| **Theme admin** | Customize forum-wide theme with live preview |
-| **Dashboard** | Stats, sync status, load test panel |
+| **Blockchain polling** | Every 30s polls for new on-chain events |
+| **IOTA subscribeEvent** | Native blockchain event subscription (~2s latency) |
+| **Cross-node sync** | Multiple servers stay in sync via blockchain events |
 
 ---
 
@@ -141,72 +141,74 @@ Open `http://localhost:5173` — generate an identity, register a username, crea
 ```
 Browser (React 19 + Vite 6 + TailwindCSS 4)
   |
-  |-- RSA-2048 keypair in localStorage
-  |-- Signs every action with private key
-  |-- Rich WYSIWYG editor (Tiptap) → markdown
+  |-- IOTA Ed25519 wallet (mnemonic-derived, AES-encrypted in localStorage)
+  |-- Signs and executes transactions DIRECTLY on blockchain
+  |-- Rich WYSIWYG editor (Tiptap) -> markdown
   |-- Theme engine (7 presets, CSS variables)
+  |-- Wallet page: balance, tips, subscriptions, escrow
   |
-  |  REST API + Socket.io WebSocket
+  |  REST API (read-only cache) + Socket.io WebSocket
   v
-Server (Sails.js + Node.js)
+Server (Sails.js + Node.js) — INDEXER ONLY
   |
-  |-- Verifies RSA-SHA256 signature on every request
-  |-- Anti-replay: nonce + 24h timestamp window
-  |-- Publishes data to blockchain via moveCall()
-  |-- SQLite cache (reconstructible from chain)
+  |-- Indexes blockchain events into SQLite cache
+  |-- Faucet: sends gas to new users (testnet)
+  |-- Serves cached data via REST for fast queries
   |-- WebSocket broadcast on every state change
   |-- 30s blockchain polling for cross-node sync
+  |-- DOES NOT sign or publish transactions for users
   |
   v
 Move Smart Contract (on-chain, immutable)
   |
-  |-- Forum (shared object): user registry + roles Table<address, u8>
+  |-- Forum (shared): user registry, roles, subscriptions, badges, reputation, treasury
+  |-- Escrow (shared objects): multi-sig 2-of-3 fund management
   |-- AdminCap (owned): deployer capability
-  |-- 4 entry functions with role-gated access
-  |-- Emits ForumEvent for every operation (gzipped JSON)
-  |-- RoleChanged events for role mutations
+  |-- 20+ entry functions with role-gated access
+  |-- Emits events for every operation (gzipped JSON payloads)
+  |-- Handles all payments: tips, subscriptions, purchases, escrow
   |
   v
 IOTA 2.0 Rebased (source of truth)
   |
   |-- Events queryable by Package ID
   |-- All nodes see the same data
-  |-- Zero fees on testnet (faucet auto-refill)
+  |-- Zero fees on testnet
 ```
 
 ### Data Flow
 
 ```
 User types a post
-  → Tiptap editor serializes to markdown
-  → Frontend signs payload with RSA private key
-  → POST /api/v1/posts (signed JSON)
-  → Server verifies signature + nonce
-  → Server calls moveCall() on the Move contract
-  → Contract checks role (USER ≥ 1), emits ForumEvent
-  → Server verifies TX on-chain (up to 3 retries)
-  → Updates local SQLite cache
-  → Broadcasts 'dataChanged' via WebSocket
-  → All connected clients update their UI
-  → Other nodes pick up the event via 30s polling
+  -> Tiptap editor serializes to markdown
+  -> Frontend gzip-compresses the JSON payload
+  -> User's Ed25519 keypair signs the transaction
+  -> Transaction executes directly on IOTA blockchain
+  -> Smart contract checks role (USER >= 1), emits ForumEvent
+  -> Backend detects event via polling/subscribe
+  -> Updates local SQLite cache
+  -> Broadcasts 'dataChanged' via WebSocket
+  -> All connected clients update their UI
 ```
 
 ---
 
 ## Smart Contract
 
-The Move smart contract (`move/forum/sources/forum.move`) is the security backbone. All permissions are enforced by IOTA validators, not by the server.
+The Move smart contract (`move/forum/sources/forum.move`) is the security backbone. All permissions and payments are enforced by IOTA validators, not by the server.
 
 ### Role System
 
 | Level | Role | Permissions |
 |-------|------|-------------|
 | 0 | **BANNED** | All operations rejected by validators |
-| 1 | **USER** | Post, reply, vote, edit own content |
-| 2 | **MODERATOR** | + Create categories, moderate content, ban/unban |
-| 3 | **ADMIN** | + Forum config, role management |
+| 1 | **USER** | Post, reply, vote, edit own content, tip, subscribe, purchase |
+| 2 | **MODERATOR** | + Create categories, moderate content, ban/unban, arbitrate escrow |
+| 3 | **ADMIN** | + Forum config, role management, configure tiers/badges, withdraw treasury |
 
 ### Entry Functions
+
+**Forum (base):**
 
 | Function | Min Role | Purpose |
 |----------|----------|---------|
@@ -216,29 +218,63 @@ The Move smart contract (`move/forum/sources/forum.move`) is the security backbo
 | `admin_post_event()` | ADMIN | Forum config, role changes |
 | `set_user_role()` | MODERATOR | Change user roles (with constraints) |
 
-### On-Chain Security Rules
+**Payments:**
 
-- Banned users cannot perform any operation (TX rejected by validators)
-- Cannot promote someone to a role equal or higher than your own
-- Cannot modify users with a role equal or higher than your own
-- Cannot change your own role (self-protection)
-- Registration is one-time per address
-- The contract deployer is auto-registered as ADMIN
+| Function | Min Role | Purpose |
+|----------|----------|---------|
+| `tip()` | USER | Send IOTA to a post author |
+| `subscribe()` | USER | Subscribe to a tier |
+| `renew_subscription()` | USER | Renew existing subscription |
+| `purchase_content()` | USER | Buy access to paid content |
+| `purchase_badge()` | USER | Buy a badge |
+| `configure_tier()` | ADMIN | Add/edit subscription tiers |
+| `configure_badge()` | ADMIN | Add/edit badges |
+| `withdraw_funds()` | ADMIN | Withdraw from forum treasury |
 
-### Event Tags
+**Escrow:**
 
-Every on-chain event includes a tag for routing:
+| Function | Who | Purpose |
+|----------|-----|---------|
+| `create_escrow()` | Buyer | Lock funds in escrow (2-of-3 multi-sig) |
+| `mark_delivered()` | Seller | Mark service as delivered |
+| `open_dispute()` | Buyer | Open a dispute |
+| `vote_release()` | Any party | Vote to release funds to seller |
+| `vote_refund()` | Any party | Vote to refund buyer |
+| `rate_trade()` | Buyer/Seller | Rate the other party (1-5 stars) |
 
-| Tag | Function | Description |
-|-----|----------|-------------|
-| `FORUM_USER` | `register()` | User registration/profile update |
-| `FORUM_THREAD` | `post_event()` | Thread creation/edit |
-| `FORUM_POST` | `post_event()` | Post/reply creation/edit |
-| `FORUM_VOTE` | `post_event()` | Upvote/downvote |
-| `FORUM_CATEGORY` | `mod_post_event()` | Category creation/edit |
-| `FORUM_MODERATION` | `mod_post_event()` | Hide/unhide/pin/lock actions |
-| `FORUM_ROLE` | `admin_post_event()` | Role assignments |
-| `FORUM_CONFIG` | `admin_post_event()` | Forum configuration |
+### Security
+
+- Each user signs with their own Ed25519 keypair — `ctx.sender()` verified by IOTA validators
+- The server never holds user private keys
+- Escrow uses cross-validated 2-of-3 voting (cannot vote on both sides)
+- Overpayments are automatically refunded (exact change returned)
+- Deadline enforcement on escrow operations
+- Banned users rejected at the contract level
+- Cannot promote above own role, cannot modify equal-or-higher role users
+
+---
+
+## Payments & Marketplace
+
+### Tips
+
+Click the tip button on any post to send IOTA directly to the author. Choose from preset amounts (0.1, 0.5, 1.0 IOTA) or enter a custom amount. Tips are instant, on-chain, with zero intermediaries.
+
+### Subscriptions
+
+Admins configure subscription tiers with price and duration. Users subscribe by paying the tier price. The smart contract automatically manages expiration and access control.
+
+### Paid Content
+
+Authors can set a price for their threads. The content is AES-256 encrypted. After payment (on-chain), the buyer receives the decryption key. 5% fee goes to the forum treasury.
+
+### Escrow
+
+For services between users, the buyer locks funds in an on-chain escrow. Three parties (buyer, seller, arbitrator) form a 2-of-3 multi-sig. Any two can release or refund the funds. 2% fee to the forum treasury on resolution.
+
+### Reputation
+
+After every escrow resolution, both parties can leave a rating (1-5 stars + comment). Ratings are immutable on-chain. User profiles display average rating, trade count, success rate, and volume.
 
 ---
 
@@ -248,7 +284,7 @@ IOTA Free Forum supports multiple independent nodes connected to the same smart 
 
 1. Runs its own Sails.js server + React frontend
 2. Has its own SQLite cache (reconstructible)
-3. Publishes transactions to the same IOTA contract
+3. Users sign transactions directly on-chain
 4. Syncs from blockchain every 30 seconds
 
 ### Joining an Existing Forum
@@ -257,33 +293,9 @@ IOTA Free Forum supports multiple independent nodes connected to the same smart 
 # Start the server
 npm run dev
 
-# In the browser: go to Setup → "Connect to existing forum"
+# In the browser: go to Setup -> "Connect to existing forum"
 # Paste the connection string: testnet:0xPACKAGE_ID:0xFORUM_OBJECT_ID
 # The system syncs all events from the blockchain
-```
-
-### Connection String Format
-
-```
-<network>:<package_id>:<forum_object_id>
-
-Example:
-testnet:0xd179...45a87:0x1e65...91b34
-```
-
-### Integrity Verification
-
-```bash
-# Check if local cache matches blockchain
-curl http://localhost:1337/api/v1/integrity-check
-
-# Response:
-{
-  "synced": true,
-  "local":  { "users": 5, "threads": 12, "posts": 87, "votes": 34 },
-  "chain":  { "users": 5, "threads": 12, "posts": 87, "votes": 34 },
-  "message": "Cache is in sync with blockchain"
-}
 ```
 
 ---
@@ -303,19 +315,17 @@ curl http://localhost:1337/api/v1/integrity-check
 | **CSS** | TailwindCSS | 4 |
 | **Animations** | Framer Motion | 12 |
 | **Editor** | Tiptap (ProseMirror) | 3 |
-| **Markdown** | react-markdown + tiptap-markdown | — |
 | **Icons** | Lucide React | Latest |
-| **Emoji** | emoji-mart | Latest |
 | **Real-time** | Socket.io | 2 |
-| **i18n** | react-i18next | Latest |
-| **Desktop** | Electron + electron-builder + electron-updater | 33 |
-| **Crypto** | Web Crypto API (browser) + Node crypto | — |
+| **i18n** | react-i18next | 8 languages |
+| **Desktop** | Electron + electron-builder | 33 |
+| **Crypto** | Ed25519 (IOTA native) + AES-256-GCM + BIP39 | — |
 
 ---
 
 ## Desktop App (Electron)
 
-IOTA Free Forum is available as a standalone desktop application for Windows, macOS, and Linux. One-click install, zero configuration — the server runs embedded inside the app.
+Available as a standalone desktop application for Windows, macOS, and Linux. The server runs embedded inside the app.
 
 ### Download
 
@@ -326,30 +336,6 @@ Download the latest release from [GitHub Releases](https://github.com/deduzzo/io
 | **Windows** | `.exe` installer | Yes |
 | **macOS** | `.dmg` | Yes |
 | **Linux** | `.AppImage` | Yes |
-
-The app automatically checks for updates from GitHub Releases and notifies users when a new version is available.
-
-### Data Storage
-
-The desktop app stores all data in the user's application data directory:
-
-| Platform | Path |
-|----------|------|
-| **Windows** | `%APPDATA%\iota-free-forum-desktop\forum-data\` |
-| **macOS** | `~/Library/Application Support/iota-free-forum-desktop/forum-data/` |
-| **Linux** | `~/.config/iota-free-forum-desktop/forum-data/` |
-
-### Building from Source
-
-```bash
-# Build for current platform
-npm run desktop:build
-
-# Build for specific platform
-npm run desktop:build:win
-npm run desktop:build:mac
-npm run desktop:build:linux
-```
 
 ---
 
@@ -362,121 +348,56 @@ npm run desktop:build:linux
 | `npm run build` | Build frontend for production |
 | `npm run move:build` | Compile the Move smart contract |
 | `npm run move:deploy` | Compile + deploy contract to IOTA testnet |
-| `npm run move:install-cli` | Install the IOTA CLI tool |
 | `npm run desktop:dev` | Run Electron in development mode |
 | `npm run desktop:build` | Build desktop app for current platform |
-| `npm run release` | Interactive release script (version bump + build + GitHub Release) |
+| `npm run release` | Interactive release script |
 
 ---
 
 ## API Endpoints
 
-### Public (no auth required)
+### Public (read-only cache)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/v1/categories` | List all categories |
+| GET | `/api/v1/categories` | List all categories with stats |
 | GET | `/api/v1/threads?category=ID&page=N` | List threads in a category |
 | GET | `/api/v1/thread/:id` | Thread detail with all posts |
-| GET | `/api/v1/user/:id` | User profile |
+| GET | `/api/v1/posts?thread=ID` | Posts for a thread |
+| GET | `/api/v1/user/:id` | User profile + reputation + badges |
+| GET | `/api/v1/user/:id/reputation` | User trade reputation |
+| GET | `/api/v1/user/:id/subscription` | User subscription status |
 | GET | `/api/v1/search?q=QUERY` | Full-text search |
-| GET | `/api/v1/config/theme` | Current theme configuration |
+| GET | `/api/v1/dashboard` | Forum + payment statistics |
+| GET | `/api/v1/marketplace` | Paid content, badges, top sellers |
+| GET | `/api/v1/escrows` | Escrow list (filterable) |
+| GET | `/api/v1/escrow/:id` | Escrow detail with ratings |
+| GET | `/api/v1/tips/:postId` | Tips on a specific post |
 | GET | `/api/v1/forum-info` | Forum metadata + connection string |
-| GET | `/api/v1/sync-status` | Sync status + wallet info |
-| GET | `/api/v1/integrity-check` | DB vs blockchain integrity check |
-| GET | `/api/v1/dashboard` | Forum statistics |
-| GET | `/api/v1/post/:id/history` | Post version history from blockchain |
-| GET | `/api/v1/thread/:id/history` | Thread version history from blockchain |
 
-### Signed (RSA signature required)
+### Server actions
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/v1/register` | Register new user identity |
-| POST | `/api/v1/threads` | Create thread |
-| POST | `/api/v1/posts` | Create post/reply |
-| PUT | `/api/v1/thread/:id` | Edit thread |
-| PUT | `/api/v1/post/:id` | Edit post |
-| POST | `/api/v1/vote` | Vote on a post |
-| POST | `/api/v1/moderate` | Moderate a post (hide/unhide) |
-| POST | `/api/v1/moderate/thread` | Moderate a thread (pin/lock/hide) |
-| POST | `/api/v1/role` | Assign role to user |
-| PUT | `/api/v1/user/:id` | Edit user profile |
-| POST | `/api/v1/categories` | Create category (mod+) |
+| POST | `/api/v1/faucet-request` | Request gas for a new address (rate-limited) |
+| POST | `/api/v1/full-reset` | Full reset (admin signature required) |
+| POST | `/api/v1/sync-reset` | Cache reset + resync (admin signature required) |
 
----
-
-## Project Structure
-
-```
-iota-free-forum/
-  move/forum/sources/
-    forum.move              # Move smart contract — roles, permissions, events
-  api/
-    controllers/            # REST API endpoints (one file per action)
-    helpers/
-      verify-signature.js   # RSA-SHA256 signature verification
-      broadcast-event.js    # WebSocket event broadcaster
-    utility/
-      iota.js               # IOTA SDK wrapper — publish, query, subscribe
-      ForumManager.js       # Blockchain sync engine + event polling
-      db.js                 # SQLite schema + model helpers
-      move-publish.js       # Contract deployment script
-    enums/
-      ForumTags.js          # Event tag constants
-  config/
-    bootstrap.js            # Startup: wallet init, sync, polling
-    routes.js               # All API routes
-    private_iota_conf.js    # Generated config (gitignored)
-  frontend/src/
-    components/
-      RichEditor.jsx        # Tiptap WYSIWYG editor
-      EditorToolbar.jsx     # Editor toolbar with all formatting buttons
-      PostCard.jsx          # Post display (dual layout: card + forum)
-      ThreadList.jsx        # Thread list (dual layout: card + table)
-      NestedReplies.jsx     # Recursive nested reply tree
-      IdentityBadge.jsx     # User avatar + name badge
-      BlockchainInfo.jsx    # On-chain TX details modal
-      EditHistory.jsx       # Version history modal
-      LoadTestPanel.jsx     # Stress test tool
-      ThemeGallery.jsx      # Theme selection grid
-      ThemeCustomizer.jsx   # Admin theme customization
-    pages/
-      Home.jsx              # Category listing
-      Category.jsx          # Thread listing
-      Thread.jsx            # Thread view with replies
-      NewThread.jsx         # Thread creation form
-      Settings.jsx          # User settings + theme picker
-      Identity.jsx          # Identity management
-      Admin.jsx             # Admin panel
-      Dashboard.jsx         # Stats + load test
-    hooks/
-      useApi.js             # Data fetching + realtime refresh
-      useIdentity.js        # RSA keypair management + signing
-      useWebSocket.js       # WebSocket connection + events
-      useTheme.js           # Theme context access
-    contexts/
-      ThemeContext.jsx       # Theme provider + CSS variable engine
-    data/
-      themes.js             # 7 theme presets
-    api/
-      endpoints.js          # API client helpers
-      crypto.js             # Web Crypto API wrappers
-```
+All write operations (posts, votes, moderation, payments, escrow) are executed directly on the IOTA blockchain by the user's wallet. The server is a read-only indexer.
 
 ---
 
 ## How Identity Works
 
-1. **Generate** — Browser creates an RSA-2048 keypair via Web Crypto API
-2. **Derive** — User ID = `USR_` + first 16 hex chars of SHA-256(publicKey)
-3. **Register** — First signed request registers the keypair on-chain
-4. **Sign** — Every subsequent action includes: `{ payload, signature, publicKey }`
-5. **Verify** — Server verifies the RSA-SHA256 signature and checks nonce uniqueness
-6. **Publish** — Server calls the Move contract, which checks the on-chain role
-7. **Export** — Users can export their identity as a JSON file and import on another device
+1. **Generate** — Browser creates an Ed25519 keypair from a BIP39 mnemonic (12 words)
+2. **Encrypt** — Mnemonic encrypted with user's password (AES-256-GCM + PBKDF2) and stored in localStorage
+3. **Faucet** — Backend sends gas IOTA to the new address (testnet)
+4. **Register** — User calls `register()` on the Move contract directly
+5. **Sign** — Every action (post, vote, tip, escrow) is a transaction signed with the user's Ed25519 key
+6. **Verify** — `ctx.sender()` verified by IOTA validators at the protocol level
+7. **Backup** — Users export their 12-word mnemonic to restore on any device
 
-No passwords. No emails. No accounts. Just math.
+No passwords on the server. No emails. No accounts. Your wallet is your identity.
 
 ---
 
@@ -492,15 +413,6 @@ Contributions are welcome! This project is in active development.
 6. Push: `git push origin feature/amazing-feature`
 7. Open a Pull Request
 
-### Areas Where Help is Needed
-
-- Additional language translations (i18n coming soon)
-- Mobile-responsive improvements
-- Additional theme presets
-- Performance optimization for large forums (10k+ posts)
-- End-to-end encrypted threads
-- IPFS integration for media storage
-
 ---
 
 ## License
@@ -511,5 +423,5 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 <p align="center">
   <strong>Built on IOTA 2.0 Rebased</strong><br/>
-  <em>Every post is a transaction. Every permission is a smart contract. Every user is a keypair.</em>
+  <em>Every post is a transaction. Every permission is a smart contract. Every user is a wallet.</em>
 </p>

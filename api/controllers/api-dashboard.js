@@ -1,8 +1,14 @@
+/**
+ * api-dashboard.js — Forum statistics dashboard.
+ *
+ * Includes new payment/marketplace stats alongside existing forum stats.
+ */
+
 const db = require('../utility/db');
 
 module.exports = {
   friendlyName: 'API Dashboard',
-  description: 'Return forum statistics: total users, threads, posts, active users in 24h.',
+  description: 'Return forum statistics: users, threads, posts, active users, payment stats.',
 
   inputs: {},
 
@@ -32,11 +38,42 @@ module.exports = {
         }
       }
 
-      // Latest threads
-      const latestThreads = Threads.findAll(
+      // Latest threads (enriched with author info + privacy)
+      const rawThreads = Threads.findAll(
         { hidden: false },
         { sort: 'createdAt DESC', limit: 5 }
       );
+      const latestThreads = rawThreads.map(thread => {
+        const author = Users.findOne({ id: thread.authorId });
+        return {
+          ...thread,
+          authorUsername: (author?.showUsername) ? author.username : null,
+          authorShowUsername: author?.showUsername || 0,
+        };
+      });
+
+      // Payment/marketplace stats
+      const database = db.getDb();
+      let paymentStats = {};
+      try {
+        const totalTips = database.prepare('SELECT COUNT(*) as cnt, COALESCE(SUM(amount), 0) as total FROM tips').get();
+        const totalPurchases = database.prepare('SELECT COUNT(*) as cnt, COALESCE(SUM(amount), 0) as total FROM purchases').get();
+        const totalEscrows = database.prepare('SELECT COUNT(*) as cnt FROM escrows').get();
+        const activeEscrows = database.prepare('SELECT COUNT(*) as cnt FROM escrows WHERE status < 3').get(); // status < RESOLVED
+        const totalSubscriptions = database.prepare('SELECT COUNT(*) as cnt FROM subscriptions WHERE expiresAt > ?').get(Date.now());
+        const totalBadges = database.prepare('SELECT COUNT(*) as cnt FROM user_badges').get();
+
+        paymentStats = {
+          tips: { count: totalTips.cnt, totalAmount: totalTips.total },
+          purchases: { count: totalPurchases.cnt, totalAmount: totalPurchases.total },
+          escrows: { total: totalEscrows.cnt, active: activeEscrows.cnt },
+          activeSubscriptions: totalSubscriptions.cnt,
+          badgesIssued: totalBadges.cnt,
+        };
+      } catch (e) {
+        // Payment tables may not exist yet in older DBs
+        sails.log.verbose('[api-dashboard] Payment stats not available:', e.message);
+      }
 
       return {
         success: true,
@@ -47,6 +84,7 @@ module.exports = {
           totalCategories,
           activeUsers24h: activeUserIds.size,
           latestThreads,
+          ...paymentStats,
         },
       };
     } catch (err) {

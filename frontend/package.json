@@ -10,6 +10,9 @@
   "dependencies": {
     "@emoji-mart/data": "^1.2.1",
     "@emoji-mart/react": "^1.1.1",
+    "@iota/iota-sdk": "^1.10.1",
+    "@noble/hashes": "^2.0.1",
+    "@scure/bip39": "^2.0.1",
     "@tiptap/extension-link": "^3.20.5",
     "@tiptap/extension-mention": "^3.20.5",
     "@tiptap/extension-placeholder": "^3.20.5",

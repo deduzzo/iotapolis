@@ -1,9 +1,11 @@
 /**
  * afterPack hook for electron-builder.
- * Rebuilds native modules (better-sqlite3) against Electron's Node.js version.
+ * 1. Rebuilds native modules (better-sqlite3) against Electron's Node.js version.
+ * 2. Ad-hoc signs the app on macOS (required for auto-update without Apple Developer ID).
  */
 const { execSync } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 
 exports.default = async function (context) {
   const appDir = path.join(context.appOutDir, context.packager.appInfo.productFilename + '.app',

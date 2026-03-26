@@ -46,8 +46,8 @@ export default function OnboardingGuard({ children }) {
       return;
     }
 
-    // Step 3: Has keypair but no username → go to /identity
-    if (identity.publicKey && !identity.username) {
+    // Step 3: Has wallet but no username → go to /identity
+    if (identity.address && !identity.username) {
       navigate('/identity', { replace: true });
       return;
     }

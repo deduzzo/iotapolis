@@ -73,7 +73,7 @@ function TableLayout({ sorted, freshThreadIds }) {
                       className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
                       style={{ background: `hsl(${(thread.authorId || '').charCodeAt(4) * 7 % 360}, 65%, 50%)` }}
                     >
-                      {(thread.authorName?.[0] || thread.authorId?.[4] || '?').toUpperCase()}
+                      {(thread.authorShowUsername && thread.authorUsername ? thread.authorUsername?.[0] : thread.authorId?.[4] || '?').toUpperCase()}
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
@@ -92,7 +92,7 @@ function TableLayout({ sorted, freshThreadIds }) {
                         <h3 className="font-semibold text-sm truncate" style={{ color: 'var(--color-text)' }}>{thread.title}</h3>
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <IdentityBadge userId={thread.authorId} username={thread.authorName} size="sm" asLink={false} />
+                        <IdentityBadge userId={thread.authorId} username={thread.authorUsername} showUsername={!!thread.authorShowUsername} size="sm" asLink={false} />
                         <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{formatTime(thread.createdAt)}</span>
                       </div>
                     </div>
@@ -104,11 +104,19 @@ function TableLayout({ sorted, freshThreadIds }) {
                   <div className="hidden md:flex items-center gap-2">
                     <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
                       style={{ background: `hsl(${(thread.lastAuthorId || thread.authorId || '').charCodeAt(4) * 11 % 360}, 60%, 50%)` }}>
-                      {(thread.lastAuthorName?.[0] || thread.authorName?.[0] || '?').toUpperCase()}
+                      {(() => {
+                        const lastShow = thread.lastAuthorShowUsername && thread.lastAuthorUsername;
+                        const authorShow = thread.authorShowUsername && thread.authorUsername;
+                        return (lastShow ? thread.lastAuthorUsername[0] : authorShow ? thread.authorUsername[0] : (thread.authorId?.[4] || '?')).toUpperCase();
+                      })()}
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>
-                        {t('threadList.by')} {thread.lastAuthorName || thread.authorName || thread.authorId?.slice(0, 10)}
+                        {t('threadList.by')} {(() => {
+                          if (thread.lastAuthorShowUsername && thread.lastAuthorUsername) return thread.lastAuthorUsername;
+                          if (thread.authorShowUsername && thread.authorUsername) return thread.authorUsername;
+                          return (thread.lastAuthorId || thread.authorId || '???').slice(0, 10);
+                        })()}
                       </p>
                       <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
                         <Clock size={10} className="inline mr-0.5" />
@@ -170,7 +178,7 @@ function CardsLayout({ sorted, freshThreadIds }) {
                         <h3 className="font-semibold text-sm md:text-base truncate">{thread.title}</h3>
                       </div>
                       <div className="flex items-center gap-3 flex-wrap">
-                        <IdentityBadge userId={thread.authorId} username={thread.authorName} size="sm" asLink={false} />
+                        <IdentityBadge userId={thread.authorId} username={thread.authorUsername} showUsername={!!thread.authorShowUsername} size="sm" asLink={false} />
                         <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
                           <MessageSquare size={12} />{thread.postCount ?? 0}
                         </span>

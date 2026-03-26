@@ -80,7 +80,7 @@ export default function Admin() {
 /* ── Categories Tab ────────────────────────────────────────────── */
 
 function CategoriesTab() {
-  const { identity, signAndSend } = useIdentity();
+  const { identity, signAndSend, postEvent } = useIdentity();
   const { addToast } = useToast();
   const { data, loading, error, reload } = useApi(
     () => api.getCategories(),
@@ -113,26 +113,29 @@ function CategoriesTab() {
   }
 
   async function executeAction() {
-    if (!confirmAction || !identity) return;
+    if (!confirmAction || !identity || !postEvent) return;
     const { cat, action } = confirmAction;
     setActionLoading(true);
     try {
-      const res = await signAndSend('/api/v1/moderate', 'POST', {
+      const result = await postEvent('FORUM_MODERATION', `MOD_${Date.now().toString(36).toUpperCase()}`, {
+        id: `MOD_${Date.now().toString(36).toUpperCase()}`,
         postId: cat.id,
+        entityType: 'category',
         action,
         reason: action === 'hide' ? 'Admin nasconde categoria' : 'Admin ripristina categoria',
-      });
-      const d = await res.json().catch(() => ({}));
-      if (res.ok && d.success) {
+        createdAt: Date.now(),
+      }, 1);
+
+      if (result.effects?.status?.status === 'success') {
         addToast(
           action === 'hide'
-            ? `Categoria "${cat.name}" nascosta — TX: ${d.digest?.substring(0, 12) || 'ok'}...`
-            : `Categoria "${cat.name}" ripristinata — TX: ${d.digest?.substring(0, 12) || 'ok'}...`,
+            ? `Categoria "${cat.name}" nascosta on-chain`
+            : `Categoria "${cat.name}" ripristinata on-chain`,
           'success'
         );
         reload();
       } else {
-        addToast('Errore: ' + (d.error || res.statusText), 'error');
+        addToast('Errore: ' + (result.effects?.status?.error || 'TX failed'), 'error');
       }
     } catch (err) {
       addToast('Errore: ' + err.message, 'error');
@@ -144,31 +147,27 @@ function CategoriesTab() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    console.log('[Admin] handleSubmit called. name:', name, 'identity:', !!identity, 'signAndSend:', typeof signAndSend);
     if (!name.trim()) { addToast('Nome categoria richiesto', 'error'); return; }
     if (!identity) { addToast('Identita non trovata — vai su /identity', 'error'); return; }
-    if (!signAndSend) { addToast('signAndSend non disponibile', 'error'); return; }
+    if (!postEvent) { addToast('Wallet non sbloccato', 'error'); return; }
 
     setSubmitting(true);
     try {
-      const url = editId
-        ? `/api/v1/categories/${editId}`
-        : '/api/v1/categories';
-      const method = editId ? 'PUT' : 'POST';
-      console.log('[Admin] Sending to', method, url);
-      const res = await signAndSend(url, method, {
+      const catId = editId || `CAT_${Date.now().toString(36).toUpperCase()}`;
+      const version = editId ? 2 : 1;
+      const result = await postEvent('FORUM_CATEGORY', catId, {
+        id: catId,
         name: name.trim(),
         description: description.trim(),
-      });
-      console.log('[Admin] Response status:', res.status);
-      const resData = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        console.error('[Admin] Category failed:', resData);
-        addToast('Errore: ' + (resData.error || res.statusText), 'error');
+        createdAt: Date.now(),
+      }, version);
+
+      if (result.effects?.status?.status !== 'success') {
+        const errMsg = result.effects?.status?.error || 'Transaction failed';
+        addToast('Errore: ' + errMsg, 'error');
         return;
       }
-      console.log('[Admin] Category OK:', resData);
-      addToast(editId ? 'Categoria aggiornata' : 'Categoria creata con TX on-chain!', 'success');
+      addToast(editId ? 'Categoria aggiornata on-chain!' : 'Categoria creata on-chain!', 'success');
       setShowForm(false);
       setName('');
       setDescription('');
@@ -378,7 +377,7 @@ function CategoriesTab() {
 /* ── Roles Tab ─────────────────────────────────────────────────── */
 
 function RolesTab() {
-  const { identity, signAndSend } = useIdentity();
+  const { identity, postEvent } = useIdentity();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState(null);
   const [searching, setSearching] = useState(false);
@@ -401,11 +400,15 @@ function RolesTab() {
   }
 
   async function assignRole(userId, role) {
-    if (!identity) return;
+    if (!identity || !postEvent) return;
     setAssigning(true);
     try {
-      const res = await signAndSend('/api/v1/user/role', 'POST', { userId, role });
-      if (!res.ok) throw new Error('Failed');
+      await postEvent('FORUM_ROLE', `ROLE_${Date.now().toString(36).toUpperCase()}`, {
+        id: `ROLE_${Date.now().toString(36).toUpperCase()}`,
+        targetUserId: userId,
+        role,
+        createdAt: Date.now(),
+      }, 1);
       // Re-search
       const r2 = await fetch(`/api/v1/user/${encodeURIComponent(userId)}`);
       if (r2.ok) setSearchResult(await r2.json());
@@ -515,7 +518,7 @@ function RolesTab() {
 /* ── Moderation Tab ────────────────────────────────────────────── */
 
 function ModerationTab() {
-  const { identity, signAndSend } = useIdentity();
+  const { identity, postEvent } = useIdentity();
 
   // Placeholder: fetch moderation queue
   const { data, loading, reload } = useApi(
@@ -527,9 +530,14 @@ function ModerationTab() {
   const items = Array.isArray(data) ? data : data?.data || [];
 
   async function handleAction(postId, action) {
-    if (!identity) return;
+    if (!identity || !postEvent) return;
     try {
-      await signAndSend(`/api/v1/moderation/${action}`, 'POST', { postId });
+      await postEvent('FORUM_MODERATION', `MOD_${Date.now().toString(36).toUpperCase()}`, {
+        id: `MOD_${Date.now().toString(36).toUpperCase()}`,
+        postId,
+        action,
+        createdAt: Date.now(),
+      }, 1);
       reload();
     } catch (err) {
       console.error(err);

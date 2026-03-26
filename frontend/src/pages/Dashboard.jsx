@@ -36,7 +36,7 @@ export default function Dashboard() {
     );
   }
 
-  const stats = dashboard || {};
+  const stats = dashboard?.stats || dashboard || {};
 
   return (
     <div className="max-w-4xl mx-auto">

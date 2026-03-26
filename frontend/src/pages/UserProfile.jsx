@@ -26,7 +26,7 @@ function avatarGradient(userId) {
 
 export default function UserProfile() {
   const { id } = useParams();
-  const { identity, signAndSend } = useIdentity();
+  const { identity, postEvent } = useIdentity();
   const isOwnProfile = identity?.userId === id;
 
   const { data: user, loading, error, reload } = useApi(
@@ -47,10 +47,15 @@ export default function UserProfile() {
   async function handleSave() {
     setSaving(true);
     try {
-      const res = await signAndSend('/api/v1/user/profile', 'PUT', {
+      const result = await postEvent('FORUM_USER', identity.userId, {
+        id: identity.userId,
         bio: bio.trim(),
-      });
-      if (!res.ok) throw new Error('Failed to save');
+        createdAt: Date.now(),
+      }, (user?.version || 1) + 1);
+
+      if (result.effects?.status?.status !== 'success') {
+        throw new Error('Failed to save');
+      }
       setEditing(false);
       reload();
     } catch (err) {
@@ -80,8 +85,9 @@ export default function UserProfile() {
     );
   }
 
-  const displayName = user.username || id?.slice(0, 12) || '???';
-  const initial = (user.username?.[0] || id?.[4] || '?').toUpperCase();
+  const canShowName = isOwnProfile || user.showUsername;
+  const displayName = (canShowName && user.username) ? user.username : (id?.slice(0, 12) || '???');
+  const initial = (canShowName && user.username ? user.username[0] : id?.[4] || '?').toUpperCase();
 
   return (
     <div className="max-w-2xl mx-auto">

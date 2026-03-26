@@ -8,6 +8,7 @@ import { useRealtimeUpdate } from '../hooks/useWebSocket';
 import { useTheme } from '../hooks/useTheme';
 import { api } from '../api/endpoints';
 import { useIdentity } from '../hooks/useIdentity';
+import { useToast } from '../components/Layout';
 import PostCard from '../components/PostCard';
 import NestedReplies from '../components/NestedReplies';
 import RichEditor from '../components/RichEditor';
@@ -26,7 +27,8 @@ function formatDate(dateStr) {
 export default function Thread() {
   const { t } = useTranslation();
   const { id } = useParams();
-  const { identity, signAndSend } = useIdentity();
+  const { identity, postEvent } = useIdentity();
+  const { addToast } = useToast();
   const { activeThemeId } = useTheme();
   const isInvisionLayout = activeThemeId?.startsWith('invision');
 
@@ -131,21 +133,33 @@ export default function Thread() {
             if (fresh) setData(fresh);
           });
         }
+
+        // Utente aggiornato (es. cambio showUsername) — refresh per aggiornare nomi autori
+        if (wsData.entity === 'user' && wsData.action === 'userUpdated') {
+          api.getThread(id).then((fresh) => {
+            if (fresh) setData(fresh);
+          });
+        }
       },
       [id, data, markFresh, setData],
     ),
-    ['post', 'thread'],
+    ['post', 'thread', 'user'],
   );
 
   const handleVote = useCallback(
     async (postId, direction) => {
       if (!identity) return;
       try {
-        const res = await signAndSend('/api/v1/vote', 'POST', { postId, vote: direction });
-        const result = await res.json().catch(() => ({}));
+        const voteId = `VOTE_${Date.now().toString(36).toUpperCase()}`;
+        const result = await postEvent('FORUM_VOTE', voteId, {
+          id: voteId,
+          postId,
+          vote: direction,
+          createdAt: Date.now(),
+        }, 1);
 
         // Optimistic update dello score
-        if (result.success) {
+        if (result.effects?.status?.status === 'success') {
           setData((prev) => {
             if (!prev) return prev;
             const prevThread = prev.thread || prev;
@@ -153,7 +167,7 @@ export default function Thread() {
 
             const updatedPosts = prevPosts.map((p) =>
               p.id === postId
-                ? { ...p, score: result.score ?? p.score, userVote: direction }
+                ? { ...p, userVote: direction }
                 : p,
             );
 
@@ -167,7 +181,7 @@ export default function Thread() {
         console.error('Vote failed:', err);
       }
     },
-    [identity, signAndSend, setData],
+    [identity, postEvent, setData],
   );
 
   const handleReply = useCallback(
@@ -182,20 +196,22 @@ export default function Thread() {
       if (!identity || !content.trim()) return;
       setSubmitting(true);
       try {
-        const res = await signAndSend('/api/v1/posts', 'POST', {
+        const postId = `POST_${Date.now().toString(36).toUpperCase()}`;
+        const result = await postEvent('FORUM_POST', postId, {
+          id: postId,
           threadId: id,
-          parentId,
+          parentId: parentId || null,
           content: content.trim(),
-        });
-        const result = await res.json().catch(() => ({}));
+          createdAt: Date.now(),
+        }, 1);
 
-        if (!res.ok) {
-          throw new Error(result.error || 'Failed to post');
+        if (result.effects?.status?.status !== 'success') {
+          throw new Error('Failed to post');
         }
 
         // Optimistic update: aggiungi il post allo state locale
         const newPost = {
-          id: result.post?.id || `POST_temp_${Date.now()}`,
+          id: postId,
           threadId: id,
           parentId: parentId || null,
           content: content.trim(),
@@ -239,7 +255,7 @@ export default function Thread() {
         setSubmitting(false);
       }
     },
-    [identity, signAndSend, id, setData, markFresh],
+    [identity, postEvent, id, setData, markFresh],
   );
 
   // Edit a post (called from PostCard)
@@ -247,12 +263,20 @@ export default function Thread() {
     async (postId, newContent) => {
       if (!identity) return;
       try {
-        const res = await signAndSend(`/api/v1/post/${postId}`, 'PUT', {
+        // Find current version from local state
+        const currentPost = posts.find((p) => p.id === postId);
+        const newVersion = (currentPost?.version || 1) + 1;
+
+        const result = await postEvent('FORUM_POST', postId, {
+          id: postId,
+          threadId: id,
           content: newContent,
-          version: 1, // server calculates real version
-        });
-        const result = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(result.error || 'Edit failed');
+          createdAt: currentPost?.createdAt || Date.now(),
+        }, newVersion);
+
+        if (result.effects?.status?.status !== 'success') {
+          throw new Error('Edit failed');
+        }
 
         // Optimistic update
         setData((prev) => {
@@ -260,7 +284,7 @@ export default function Thread() {
           const prevThread = prev.thread || prev;
           const prevPosts = prev.posts || prevThread?.posts || [];
           const updatedPosts = prevPosts.map((p) =>
-            p.id === postId ? { ...p, content: newContent, version: (p.version || 1) + 1, updatedAt: Date.now() } : p,
+            p.id === postId ? { ...p, content: newContent, version: newVersion, updatedAt: Date.now() } : p,
           );
           if (prev.posts !== undefined) return { ...prev, posts: updatedPosts };
           return { ...prev, thread: { ...prevThread, posts: updatedPosts } };
@@ -269,7 +293,7 @@ export default function Thread() {
         console.error('Edit failed:', err);
       }
     },
-    [identity, signAndSend, setData],
+    [identity, postEvent, id, posts, setData],
   );
 
   // Edit OP (thread content)
@@ -277,18 +301,23 @@ export default function Thread() {
     if (!identity || !editOPContent.trim()) return;
     setEditOPSubmitting(true);
     try {
-      const res = await signAndSend(`/api/v1/thread/${id}`, 'PUT', {
+      const newVersion = (thread?.version || 1) + 1;
+      const result = await postEvent('FORUM_THREAD', id, {
+        id,
         title: thread?.title,
         content: editOPContent.trim(),
-        version: 1,
-      });
-      const result = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(result.error || 'Edit failed');
+        categoryId: thread?.categoryId,
+        createdAt: thread?.createdAt || Date.now(),
+      }, newVersion);
+
+      if (result.effects?.status?.status !== 'success') {
+        throw new Error('Edit failed');
+      }
 
       setData((prev) => {
         if (!prev) return prev;
         const prevThread = prev.thread || prev;
-        return { ...prev, thread: { ...prevThread, content: editOPContent.trim(), version: (prevThread.version || 1) + 1, updatedAt: Date.now() } };
+        return { ...prev, thread: { ...prevThread, content: editOPContent.trim(), version: newVersion, updatedAt: Date.now() } };
       });
       setEditingOP(false);
     } catch (err) {
@@ -296,7 +325,7 @@ export default function Thread() {
     } finally {
       setEditOPSubmitting(false);
     }
-  }, [identity, signAndSend, id, editOPContent, thread, setData]);
+  }, [identity, postEvent, id, editOPContent, thread, setData]);
 
   if (loading) {
     return <LoadingSpinner size={32} className="min-h-[40vh]" />;
@@ -318,7 +347,7 @@ export default function Thread() {
     );
   }
 
-  const isLocked = thread.locked;
+  const isLocked = !!thread.locked;
   const currentUserId = identity?.userId || null;
 
   return (

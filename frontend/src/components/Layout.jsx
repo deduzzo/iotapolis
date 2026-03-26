@@ -2,18 +2,21 @@ import { useState, useCallback, useEffect, createContext, useContext } from 'rea
 import { Outlet, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  Home, BarChart3, Fingerprint, ShieldCheck,
+  Home, BarChart3, Fingerprint, ShieldCheck, Users,
   Search, Wifi, WifiOff, Menu, Settings, Globe, Wallet,
-  Loader2, AlertTriangle, Fuel,
+  Loader2, AlertTriangle, Fuel, Store, Shield, Crown,
 } from 'lucide-react';
 import Sidebar from './Sidebar';
 import IdentityBadge from './IdentityBadge';
 import OnboardingGuard from './OnboardingGuard';
+import UnlockGuard from './UnlockGuard';
 import Toast from './Toast';
+import TransactionTracker from './TransactionTracker';
 import UpdateNotifier from './UpdateNotifier';
 import { useTheme } from '../hooks/useTheme';
 import { useIdentity } from '../hooks/useIdentity';
 import { useApi } from '../hooks/useApi';
+import { useRealtimeUpdate } from '../hooks/useWebSocket';
 import { api } from '../api/endpoints';
 import { useTranslation } from 'react-i18next';
 
@@ -34,7 +37,12 @@ let _toastId = 0;
 function getNavItems(isAdmin, t) {
   const items = [
     { to: '/', icon: Home, label: t('nav.home'), group: 'Forum' },
+    { to: '/users', icon: Users, label: t('nav.users', 'Utenti'), group: 'Forum' },
     { to: '/dashboard', icon: BarChart3, label: t('nav.dashboard'), group: 'Forum' },
+    { to: '/marketplace', icon: Store, label: t('nav.marketplace'), group: 'Forum' },
+    { to: '/wallet', icon: Wallet, label: t('nav.wallet'), group: 'Account' },
+    { to: '/escrow', icon: Shield, label: t('nav.escrow'), group: 'Account' },
+    { to: '/subscription', icon: Crown, label: t('nav.subscription'), group: 'Account' },
     { to: '/identity', icon: Fingerprint, label: t('nav.identity'), group: 'Account' },
   ];
   if (isAdmin) {
@@ -216,6 +224,19 @@ export default function Layout() {
   const dismissToast = useCallback((id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
+
+  /* Global WebSocket notifications */
+  useRealtimeUpdate(
+    useCallback((wsData) => {
+      if (wsData.action === 'userPromotedAdmin' && wsData.userId === identity?.userId) {
+        addToast('Sei stato promosso ad ADMIN on-chain!', 'success');
+      }
+      if (wsData.action === 'adminPromotionFailed' && wsData.userId === identity?.userId) {
+        addToast('Promozione admin fallita: ' + (wsData.label || 'errore'), 'error');
+      }
+    }, [identity?.userId, addToast]),
+    ['user', 'error'],
+  );
 
   /* Sync status */
   const { data: syncStatus } = useApi(
@@ -425,19 +446,27 @@ export default function Layout() {
                   <IdentityBadge
                     userId={identity.userId}
                     username={identity.username}
+                    showUsername={true}
                     size="sm"
                   />
-                  {userProfile?.user?.role && (
-                    <span
-                      className="text-[10px] px-1.5 py-0.5 rounded font-medium uppercase"
-                      style={{
-                        backgroundColor: isAdmin ? 'rgba(255,68,68,0.15)' : 'rgba(0,240,255,0.15)',
-                        color: isAdmin ? 'var(--color-danger)' : 'var(--color-primary)',
-                      }}
-                    >
-                      {userProfile.user.role}
-                    </span>
-                  )}
+                  {(() => {
+                    const role = userProfile?.user?.role;
+                    if (!role) return null;
+                    const colors = {
+                      admin: { bg: 'rgba(255,68,68,0.15)', color: '#ff4444' },
+                      moderator: { bg: 'rgba(168,85,247,0.15)', color: '#a855f7' },
+                      user: { bg: 'rgba(0,240,255,0.15)', color: 'var(--color-primary)' },
+                    };
+                    const c = colors[role] || colors.user;
+                    return (
+                      <span
+                        className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider"
+                        style={{ backgroundColor: c.bg, color: c.color, border: `1px solid ${c.color}30` }}
+                      >
+                        {role}
+                      </span>
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -446,13 +475,16 @@ export default function Layout() {
           {/* Page content */}
           <main className="flex-1 p-4 md:p-6">
             <OnboardingGuard>
-              <Outlet />
+              <UnlockGuard>
+                <Outlet />
+              </UnlockGuard>
             </OnboardingGuard>
           </main>
         </div>
 
         {/* Toasts */}
         <Toast toasts={toasts} onDismiss={dismissToast} />
+        <TransactionTracker />
       </div>
     </ToastContext.Provider>
   );

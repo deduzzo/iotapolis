@@ -1,85 +1,40 @@
-const db = require('../utility/db');
-const ForumTags = require('../enums/ForumTags');
+/**
+ * create-category.js — DEPRECATED
+ *
+ * Category creation now happens on-chain. Admins call
+ * mod_post_event(FORUM_CATEGORY, ...) directly on the Move smart contract.
+ * The backend detects new categories via blockchain event polling.
+ */
 
 module.exports = {
-  friendlyName: 'Create category',
-  description: 'Create a new forum category (admin only).',
+  friendlyName: 'Create category (Deprecated)',
+  description: 'Category creation is now on-chain. This endpoint returns a deprecation notice.',
 
   inputs: {
-    name: { type: 'string', required: true },
+    name: { type: 'string' },
     description: { type: 'string', allowNull: true },
-    sortOrder: { type: 'number', defaultsTo: 0 },
+    sortOrder: { type: 'number' },
     authorId: { type: 'string' },
-    nonce: { type: 'string', required: true },
-    version: { type: 'number', defaultsTo: 1 },
-    createdAt: { type: 'number', required: true },
-    publicKey: { type: 'string', required: true },
-    signature: { type: 'string', required: true },
+    nonce: { type: 'string' },
+    version: { type: 'number' },
+    createdAt: { type: 'number' },
+    publicKey: { type: 'string' },
+    signature: { type: 'string' },
   },
 
   exits: {
     success: { statusCode: 200 },
-    badRequest: { statusCode: 400 },
-    forbidden: { statusCode: 403 },
+    gone: { statusCode: 410 },
   },
 
-  fn: async function (inputs) {
-    try {
-      const { userId } = await sails.helpers.verifySignature(this.req.body);
-      console.log('[create-category] Verified userId:', userId);
-
-      // Check admin role
-      const Users = db.getModel('users');
-      const user = Users.findOne({ id: userId });
-      console.log('[create-category] User found:', user ? `${user.username} role=${user.role}` : 'NOT FOUND');
-      if (!user || user.role !== 'admin') {
-        console.log('[create-category] FORBIDDEN — not admin');
-        this.res.status(403);
-        return { success: false, error: `Access denied. User ${userId} role: ${user?.role || 'not found'}` };
-      }
-
-      // Generate id from nonce
-      const categoryId = 'CAT_' + inputs.nonce.substring(0, 8);
-
-      // Publish to blockchain
-      const ForumManager = require('../utility/ForumManager');
-      const txResult = await ForumManager.publishToChain(ForumTags.FORUM_CATEGORY, categoryId, {
-        id: categoryId,
-        name: inputs.name,
-        description: inputs.description || null,
-        authorId: userId,
-        nonce: inputs.nonce,
-        version: 1,
-        createdAt: inputs.createdAt,
-      });
-
-      if (!txResult.success || txResult.verified === false) {
-        this.res.status(503);
-        return { success: false, error: 'Blockchain TX failed: ' + (txResult.error || 'not verified') };
-      }
-
-      // publishToChain already cached via processTransaction
-      const Categories = db.getModel('categories');
-      const category = Categories.findOne({ id: categoryId });
-
-      // Broadcast
-      await sails.helpers.broadcastEvent('dataChanged', {
-        entity: 'category',
-        action: 'categoryCreated',
-        label: inputs.name,
-        categoryId,
-      });
-
-      return {
-        success: true,
-        category,
-        digest: txResult?.digest || null,
-      };
-    } catch (err) {
-      if (err === 'forbidden') throw 'forbidden';
-      sails.log.error('[create-category]', err.message || err);
-      this.res.status(err.message?.includes('signature') || err.message?.includes('nonce') ? 400 : 500);
-      return { success: false, error: err.message || String(err) };
-    }
+  fn: async function () {
+    this.res.status(410);
+    return {
+      success: false,
+      error: 'Category creation endpoint deprecated. Admins now call mod_post_event(FORUM_CATEGORY, ...) directly on the IOTA blockchain.',
+      migration: {
+        action: 'Use IOTA SDK to call forum::mod_post_event() with FORUM_CATEGORY tag',
+      },
+    };
   },
 };

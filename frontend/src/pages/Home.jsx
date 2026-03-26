@@ -100,10 +100,17 @@ export default function Home() {
             if (fresh) setCategories(fresh);
           });
         }
+
+        // Utente aggiornato (es. cambio showUsername) — refresh categorie per aggiornare lastAuthor
+        if (wsData.entity === 'user' && wsData.action === 'userUpdated') {
+          api.getCategories().then((fresh) => {
+            if (fresh) setCategories(fresh);
+          });
+        }
       },
       [setCategories, markCatFresh],
     ),
-    ['category', 'thread', 'post'],
+    ['category', 'thread', 'post', 'user'],
   );
   const { activeThemeId } = useTheme();
   const isInvisionLayout = activeThemeId?.startsWith('invision');

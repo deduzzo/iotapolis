@@ -1,199 +1,475 @@
-import { useState, useEffect, useCallback } from 'react';
-import { generateKeypair, signPayload, deriveUserId } from '../api/crypto';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  generateMnemonic,
+  keypairFromMnemonic,
+  getAddress,
+  encryptMnemonic,
+  decryptMnemonic,
+  isValidMnemonic,
+  signAndExecuteTransaction,
+  Transaction,
+  CLOCK_OBJECT_ID,
+  gzipCompress,
+  setNetwork,
+  getClient,
+} from '../api/crypto';
+import {
+  addTransaction,
+  updateTransaction,
+  completeTransaction,
+  failTransaction,
+  getTransactionStatus,
+} from './useTransactions';
+import { api } from '../api/endpoints';
 
 const STORAGE_KEY = 'forum_identity';
 
 /**
- * React hook that manages the user's cryptographic identity.
- * Identity is persisted in localStorage as:
- *   { privateKey, publicKey, userId, username }
+ * React hook that manages the user's IOTA Ed25519 identity.
+ *
+ * Storage layout in localStorage (STORAGE_KEY):
+ *   { encryptedMnemonic: string, address: string, username: string|null }
+ *
+ * The keypair is NEVER stored — it's derived from the mnemonic each session.
  */
-export function useIdentity() {
-  const [identity, setIdentity] = useState(null);
-  const [loading, setLoading] = useState(true);
+// ── Shared singleton state (across all hook instances) ─────────────────────
+let _keypair = null;
+let _unlocked = false;
+const _unlockListeners = new Set();
 
-  // Load identity from localStorage on mount
+function _setGlobalUnlocked(val, kp = null) {
+  _unlocked = val;
+  _keypair = kp;
+  _unlockListeners.forEach(fn => fn(val));
+}
+
+export function useIdentity() {
+  const [identity, setIdentity] = useState(null);   // { address, username, encryptedMnemonic }
+  const [unlocked, setUnlocked] = useState(_unlocked);
+  const [loading, setLoading] = useState(true);
+  const [forumConfig, setForumConfig] = useState(null); // { packageId, forumObjectId, network }
+
+  // Sync local state with global singleton
+  useEffect(() => {
+    const listener = (val) => setUnlocked(val);
+    _unlockListeners.add(listener);
+    // Sync initial state
+    setUnlocked(_unlocked);
+    return () => _unlockListeners.delete(listener);
+  }, []);
+
+  // Ref that always points to the global keypair
+  const keypairRef = useRef(null);
+  keypairRef.current = _keypair;
+
+  // ── Load stored identity + forum config on mount ──────────────────────────
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        setIdentity(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        setIdentity(parsed);
       }
     } catch {
-      // Corrupted data — ignore
       localStorage.removeItem(STORAGE_KEY);
     }
     setLoading(false);
   }, []);
 
-  // Persist identity changes
+  // Fetch forum config (packageId, forumObjectId, network) once
+  useEffect(() => {
+    let cancelled = false;
+    api.getForumInfo()
+      .then((info) => {
+        if (cancelled || !info.success) return;
+        const cfg = {
+          packageId: info.packageId,
+          forumObjectId: info.forumObjectId,
+          network: info.network || 'testnet',
+          explorerUrl: info.explorerUrl,
+        };
+        setForumConfig(cfg);
+        // Configure IOTA client with the correct network
+        if (cfg.network) setNetwork(cfg.network);
+      })
+      .catch(() => { /* forum-info not available yet */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  // ── Persist helper ────────────────────────────────────────────────────────
+
   const persistIdentity = useCallback((newIdentity) => {
     setIdentity(newIdentity);
     if (newIdentity) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newIdentity));
+      // Only persist safe fields — never the keypair
+      const safe = {
+        encryptedMnemonic: newIdentity.encryptedMnemonic,
+        address: newIdentity.address,
+        username: newIdentity.username || null,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(safe));
     } else {
       localStorage.removeItem(STORAGE_KEY);
     }
   }, []);
 
+  // ── Generate new identity ─────────────────────────────────────────────────
+
   /**
-   * Generate a new RSA-2048 keypair and derive userId.
-   * Does NOT register a username yet.
+   * Generate a new Ed25519 identity.
+   * Returns { mnemonic, address } — caller must show mnemonic to user once.
+   * The password is used to encrypt the mnemonic for localStorage.
    */
-  const generateIdentity = useCallback(async () => {
-    const { publicKeyPem, privateKeyPem } = await generateKeypair();
-    const userId = await deriveUserId(publicKeyPem);
+  // Pending identity — generated but not yet confirmed by user (mnemonic not yet saved)
+  const pendingRef = useRef(null);
+
+  const generateIdentity = useCallback(async (password) => {
+    if (!password || password.length < 4) {
+      throw new Error('Password must be at least 4 characters');
+    }
+
+    const mnemonic = generateMnemonic();
+    const kp = keypairFromMnemonic(mnemonic);
+    const addr = getAddress(kp);
+    const encrypted = await encryptMnemonic(mnemonic, password);
+
+    // DON'T persist yet — wait for user to confirm they saved the mnemonic
+    pendingRef.current = { kp, encrypted, addr };
+
+    return { mnemonic, address: addr };
+  }, []);
+
+  /**
+   * Called after user confirms they saved the mnemonic.
+   * Completes the identity setup: persists to localStorage, sets unlocked.
+   */
+  const confirmMnemonicSaved = useCallback(() => {
+    const pending = pendingRef.current;
+    if (!pending) return;
+
+    _setGlobalUnlocked(true, pending.kp);
 
     const newIdentity = {
-      privateKey: privateKeyPem,
-      publicKey: publicKeyPem,
-      userId,
+      encryptedMnemonic: pending.encrypted,
+      address: pending.addr,
       username: null,
     };
+    persistIdentity(newIdentity);
+    pendingRef.current = null;
+  }, [persistIdentity]);
 
+  // ── Unlock existing identity ──────────────────────────────────────────────
+
+  /**
+   * Decrypt the stored mnemonic with the user's password, derive keypair.
+   * Throws on wrong password.
+   */
+  const unlockIdentity = useCallback(async (password) => {
+    if (!identity?.encryptedMnemonic) {
+      throw new Error('No identity to unlock');
+    }
+    const mnemonic = await decryptMnemonic(identity.encryptedMnemonic, password);
+    const kp = keypairFromMnemonic(mnemonic);
+    const addr = getAddress(kp);
+
+    // Verify the derived address matches what we stored
+    if (addr !== identity.address) {
+      throw new Error('Derived address mismatch — data may be corrupted');
+    }
+
+    _setGlobalUnlocked(true, kp);
+    return true;
+  }, [identity]);
+
+  // ── Lock (clear keypair from memory) ──────────────────────────────────────
+
+  const lockIdentity = useCallback(() => {
+    _setGlobalUnlocked(false, null);
+  }, []);
+
+  // ── Register username on-chain ────────────────────────────────────────────
+
+  /**
+   * Build a TX calling register() on the Move smart contract.
+   * The username is stored in the gzipped data payload.
+   */
+  const registerUsername = useCallback(async (username) => {
+    if (!keypairRef.current) throw new Error('Identity not unlocked');
+    if (!forumConfig?.packageId || !forumConfig?.forumObjectId) {
+      throw new Error('Forum not configured — contract not deployed');
+    }
+
+    const entityId = identity.address;
+    const data = await gzipCompress({
+      username,
+      address: identity.address,
+      registeredAt: Date.now(),
+    });
+
+    const tx = new Transaction();
+    tx.moveCall({
+      target: `${forumConfig.packageId}::forum::register`,
+      arguments: [
+        tx.object(forumConfig.forumObjectId),
+        tx.pure.vector('u8', Array.from(new TextEncoder().encode(entityId))),
+        tx.pure.vector('u8', Array.from(data)),
+        tx.object(CLOCK_OBJECT_ID),
+      ],
+    });
+    tx.setGasBudget(50_000_000);
+
+    const txId = addTransaction(`Registrazione username "${username}"`, 'REGISTER');
+    try {
+      updateTransaction(txId, { status: 'submitted' });
+      const result = await signAndExecuteTransaction(keypairRef.current, tx);
+
+      if (result.effects?.status?.status !== 'success') {
+        const errMsg = result.effects?.status?.error || 'Registration failed on-chain';
+        failTransaction(txId, errMsg);
+        throw new Error(errMsg);
+      }
+
+      completeTransaction(txId, result.digest);
+      const updated = { ...identity, username };
+      persistIdentity(updated);
+      return updated;
+    } catch (err) {
+      if (getTransactionStatus(txId) !== 'failed') failTransaction(txId, err);
+      throw err;
+    }
+  }, [identity, forumConfig, persistIdentity]);
+
+  // ── Sign and send a Transaction directly on-chain ──────────────────────────
+
+  /**
+   * Sign a pre-built Transaction with the user's keypair and execute on IOTA.
+   * Use this from useWallet or components that build Move TX directly.
+   */
+  const signAndSendTx = useCallback(async (transactionBlock) => {
+    if (!keypairRef.current) throw new Error('Identity not unlocked');
+    return signAndExecuteTransaction(keypairRef.current, transactionBlock);
+  }, []);
+
+  // ── Legacy HTTP signAndSend (backward compat for existing components) ─────
+
+  /**
+   * LEGACY: Sign a payload and send to a backend API endpoint.
+   * Adds authorId (address), nonce, createdAt, and a dummy signature header.
+   * This bridges old components until they are migrated to direct TX signing.
+   *
+   * @param {string} url - API endpoint
+   * @param {string} method - HTTP method
+   * @param {object} data - Payload
+   */
+  const signAndSend = useCallback(async (url, method, data = {}) => {
+    if (!identity?.address) throw new Error('No identity');
+    if (!keypairRef.current) throw new Error('Identity not unlocked — cannot sign');
+
+    const payload = {
+      ...data,
+      authorId: identity.address,
+      nonce: crypto.randomUUID(),
+      createdAt: Date.now(),
+    };
+
+    // Sign the payload with Ed25519 keypair for backend verification
+    const message = JSON.stringify(payload);
+    const msgBytes = new TextEncoder().encode(message);
+    const { signature } = await keypairRef.current.signPersonalMessage(msgBytes);
+    const publicKey = keypairRef.current.getPublicKey().toBase64();
+
+    return fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Signature': signature,
+        'X-Public-Key': publicKey,
+      },
+      body: JSON.stringify(payload),
+    });
+  }, [identity?.address]);
+
+  // ── Post event helper (forum actions) ─────────────────────────────────────
+
+  /**
+   * Build and execute a post_event / mod_post_event / admin_post_event TX.
+   * Handles gzip compression and Move function routing.
+   */
+  const TAG_LABELS = {
+    FORUM_THREAD: 'Nuovo thread',
+    FORUM_POST: 'Nuovo post',
+    FORUM_VOTE: 'Voto',
+    FORUM_CATEGORY: 'Categoria',
+    FORUM_MODERATION: 'Moderazione',
+    FORUM_ROLE: 'Ruolo utente',
+    FORUM_CONFIG: 'Configurazione',
+    FORUM_USER: 'Profilo utente',
+  };
+
+  const postEvent = useCallback(async (tag, entityId, dataObject, version = 1) => {
+    if (!keypairRef.current) throw new Error('Identity not unlocked');
+    if (!forumConfig?.packageId || !forumConfig?.forumObjectId) {
+      throw new Error('Forum not configured');
+    }
+
+    const txLabel = TAG_LABELS[tag] || tag;
+    const txId = addTransaction(txLabel, tag);
+
+    try {
+      const compressed = await gzipCompress(dataObject);
+
+      const ADMIN_TAGS = ['FORUM_ROLE', 'FORUM_CONFIG'];
+      const MOD_TAGS = ['FORUM_MODERATION', 'FORUM_CATEGORY'];
+
+      const tx = new Transaction();
+      const commonArgs = [
+        tx.pure.vector('u8', Array.from(new TextEncoder().encode(tag))),
+        tx.pure.vector('u8', Array.from(new TextEncoder().encode(entityId))),
+        tx.pure.vector('u8', Array.from(compressed)),
+        tx.pure.u64(version),
+        tx.object(CLOCK_OBJECT_ID),
+      ];
+
+      let target;
+      if (ADMIN_TAGS.includes(tag)) {
+        target = `${forumConfig.packageId}::forum::admin_post_event`;
+      } else if (MOD_TAGS.includes(tag)) {
+        target = `${forumConfig.packageId}::forum::mod_post_event`;
+      } else {
+        target = `${forumConfig.packageId}::forum::post_event`;
+      }
+
+      tx.moveCall({
+        target,
+        arguments: [tx.object(forumConfig.forumObjectId), ...commonArgs],
+      });
+      tx.setGasBudget(50_000_000);
+
+      updateTransaction(txId, { status: 'submitted' });
+      const result = await signAndExecuteTransaction(keypairRef.current, tx);
+
+      if (result.effects?.status?.status !== 'success') {
+        const errMsg = result.effects?.status?.error || 'Transaction failed';
+        failTransaction(txId, errMsg);
+        throw new Error(errMsg);
+      }
+
+      completeTransaction(txId, result.digest);
+      return result;
+    } catch (err) {
+      if (getTransactionStatus(txId) !== 'failed') failTransaction(txId, err);
+      throw err;
+    }
+  }, [forumConfig]);
+
+  // ── Export mnemonic (requires password) ───────────────────────────────────
+
+  const exportMnemonic = useCallback(async (password) => {
+    if (!identity?.encryptedMnemonic) throw new Error('No identity');
+    return decryptMnemonic(identity.encryptedMnemonic, password);
+  }, [identity]);
+
+  // ── Import from mnemonic ──────────────────────────────────────────────────
+
+  const importIdentity = useCallback(async (mnemonic, password) => {
+    if (!isValidMnemonic(mnemonic)) {
+      throw new Error('Invalid BIP39 mnemonic');
+    }
+    if (!password || password.length < 4) {
+      throw new Error('Password must be at least 4 characters');
+    }
+
+    const kp = keypairFromMnemonic(mnemonic);
+    const addr = getAddress(kp);
+    const encrypted = await encryptMnemonic(mnemonic, password);
+
+    _setGlobalUnlocked(true, kp);
+
+    // Try to find existing username for this address
+    let username = null;
+    try {
+      const userInfo = await api.getUser(addr);
+      if (userInfo?.user?.username) {
+        username = userInfo.user.username;
+      }
+    } catch { /* new user */ }
+
+    const newIdentity = {
+      encryptedMnemonic: encrypted,
+      address: addr,
+      username,
+    };
     persistIdentity(newIdentity);
     return newIdentity;
   }, [persistIdentity]);
 
-  /**
-   * Register a username by POSTing a signed payload to /api/v1/register.
-   */
-  const registerUsername = useCallback(
-    async (username) => {
-      if (!identity) throw new Error('No identity — generate one first');
+  // ── Change password ───────────────────────────────────────────────────────
 
-      const response = await signAndSendInternal(
-        identity,
-        '/api/v1/register',
-        'POST',
-        { username },
-      );
+  const changePassword = useCallback(async (oldPassword, newPassword) => {
+    if (!identity?.encryptedMnemonic) throw new Error('No identity');
+    if (!newPassword || newPassword.length < 4) {
+      throw new Error('New password must be at least 4 characters');
+    }
 
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: 'Registration failed' }));
-        throw new Error(err.error || 'Registration failed');
-      }
+    const mnemonic = await decryptMnemonic(identity.encryptedMnemonic, oldPassword);
+    const encrypted = await encryptMnemonic(mnemonic, newPassword);
 
-      const updated = { ...identity, username };
-      persistIdentity(updated);
-      return updated;
-    },
-    [identity, persistIdentity],
-  );
+    const updated = { ...identity, encryptedMnemonic: encrypted };
+    persistIdentity(updated);
+    return true;
+  }, [identity, persistIdentity]);
 
-  /**
-   * Sign a payload and send it to an API endpoint.
-   * Adds authorId, nonce, createdAt, signature, and publicKey.
-   */
-  const signAndSend = useCallback(
-    async (url, method, data = {}) => {
-      if (!identity) throw new Error('No identity — generate one first');
-      return signAndSendInternal(identity, url, method, data);
-    },
-    [identity],
-  );
+  // ── Clear identity ────────────────────────────────────────────────────────
 
-  /**
-   * Export identity as a downloadable JSON file.
-   */
-  const exportIdentity = useCallback(() => {
-    if (!identity) return;
-
-    const exportData = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      identity: {
-        privateKey: identity.privateKey,
-        publicKey: identity.publicKey,
-        userId: identity.userId,
-        username: identity.username,
-      },
-    };
-
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
-      type: 'application/json',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `iota-forum-identity-${identity.userId}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, [identity]);
-
-  /**
-   * Import identity from a JSON file (File object).
-   */
-  const importIdentity = useCallback(
-    async (file) => {
-      const text = await file.text();
-      const data = JSON.parse(text);
-
-      const imported = data.identity || data;
-      if (!imported.privateKey || !imported.publicKey) {
-        throw new Error('Invalid identity file — missing keys');
-      }
-
-      // Re-derive userId to verify integrity
-      const userId = await deriveUserId(imported.publicKey);
-
-      const newIdentity = {
-        privateKey: imported.privateKey,
-        publicKey: imported.publicKey,
-        userId,
-        username: imported.username || null,
-      };
-
-      persistIdentity(newIdentity);
-      return newIdentity;
-    },
-    [persistIdentity],
-  );
-
-  /**
-   * Clear identity from state and localStorage.
-   */
   const clearIdentity = useCallback(() => {
+    _setGlobalUnlocked(false, null);
     persistIdentity(null);
   }, [persistIdentity]);
 
+  // ── Get balance ───────────────────────────────────────────────────────────
+
+  const getBalance = useCallback(async () => {
+    if (!identity?.address) return null;
+    try {
+      const client = getClient();
+      const balance = await client.getBalance({ owner: identity.address });
+      return balance;
+    } catch {
+      return null;
+    }
+  }, [identity?.address]);
+
+  // Build a backward-compatible identity object that includes userId alias
+  const compatIdentity = identity ? {
+    ...identity,
+    userId: identity.address,  // Legacy alias: components use identity.userId
+  } : null;
+
   return {
-    identity,
+    // State
+    identity: compatIdentity,
+    unlocked,
     loading,
+    forumConfig,
+    keypair: keypairRef.current,
+
+    // Actions — new
     generateIdentity,
+    confirmMnemonicSaved,
+    unlockIdentity,
+    lockIdentity,
     registerUsername,
-    signAndSend,
-    exportIdentity,
+    signAndSendTx,       // Direct on-chain TX signing
+    postEvent,           // Build + sign + execute a forum event TX
+    exportMnemonic,
     importIdentity,
+    changePassword,
     clearIdentity,
+    getBalance,
+
+    // Actions — legacy compat (HTTP-based, for existing components)
+    signAndSend,         // Legacy: signAndSend(url, method, data)
+    exportIdentity: () => {}, // No-op stub (old JSON export removed)
   };
-}
-
-// ---------------------------------------------------------------------------
-// Internal helper (not exported — avoids stale closure on `identity`)
-// ---------------------------------------------------------------------------
-
-async function signAndSendInternal(identity, url, method, data = {}) {
-  const payload = {
-    ...data,
-    authorId: identity.userId,
-    nonce: crypto.randomUUID(),
-    createdAt: Date.now(),
-  };
-
-  const signature = await signPayload(identity.privateKey, payload);
-
-  const body = {
-    ...payload,
-    signature,
-    publicKey: identity.publicKey,
-  };
-
-  return fetch(url, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
 }

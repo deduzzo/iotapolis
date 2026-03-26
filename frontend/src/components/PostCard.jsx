@@ -5,6 +5,7 @@ import IdentityBadge from './IdentityBadge';
 import MarkdownRender from './MarkdownRender';
 import RichEditor from './RichEditor';
 import VoteButtons from './VoteButtons';
+import TipButton from './TipButton';
 import BlockchainInfo from './BlockchainInfo';
 import { useTranslation } from 'react-i18next';
 
@@ -128,6 +129,12 @@ export default function PostCard({
           <MessageSquare size={12} />{t('post.reply')}
         </button>
       )}
+      <TipButton
+        postId={post.id}
+        authorId={post.authorId}
+        tipCount={post.tipCount || 0}
+        totalTips={post.totalTips || 0}
+      />
       {isAuthor && !editing && (
         <button onClick={startEdit}
           className="flex items-center gap-1 text-xs hover:underline transition-colors"

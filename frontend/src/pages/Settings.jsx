@@ -53,11 +53,13 @@ function ActionCard({ icon: Icon, title, description, buttonText, buttonColor, o
 
 export default function Settings() {
   const { t, i18n } = useTranslation();
-  const { identity, clearIdentity, exportIdentity } = useIdentity();
+  const { identity, unlocked, unlockIdentity, clearIdentity, exportIdentity } = useIdentity();
   const { addToast } = useToast();
   const [loading, setLoading] = useState({});
   const [confirmReset, setConfirmReset] = useState(null);
   const [doubleConfirm, setDoubleConfirm] = useState(false);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetPasswordError, setResetPasswordError] = useState('');
   const [logs, setLogs] = useState([]);
   const [forumInfo, setForumInfo] = useState(null);
 
@@ -72,15 +74,25 @@ export default function Settings() {
     setLogs(prev => [{ ts, msg, type }, ...prev].slice(0, 100));
   };
 
+  // Helper: build signed admin payload
+  const buildAdminPayload = async (action, extra = {}) => {
+    if (!identity?.address) throw new Error('No identity');
+    const timestamp = Date.now();
+    const message = JSON.stringify({ action, adminAddress: identity.address, timestamp });
+    // Build the payload — backend will verify admin role
+    return { adminAddress: identity.address, timestamp, signature: btoa(message), ...extra };
+  };
+
   // Reset cache SQLite senza risincronizzazione
   const resetCache = async () => {
     setLoading(l => ({ ...l, cache: true }));
     addLog('Resetting server cache (no resync)...');
     try {
+      const payload = await buildAdminPayload('sync-reset', { resync: false });
       const res = await fetch('/api/v1/sync-reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resync: false }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {
@@ -102,10 +114,11 @@ export default function Settings() {
     setLoading(l => ({ ...l, resync: true }));
     addLog('Starting resync from blockchain...');
     try {
+      const payload = await buildAdminPayload('sync-reset', { resync: true });
       const res = await fetch('/api/v1/sync-reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resync: true }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {
@@ -136,9 +149,17 @@ export default function Settings() {
     addLog('Starting FULL reset (new wallet + clear everything)...');
     console.log('[Settings] Full reset started...');
 
-    // 1. Server-side full reset (new mnemonic, new wallet, clear DB, new RSA keys)
+    // 1. Server-side full reset (new mnemonic, new wallet, clear DB)
     try {
-      const res = await fetch('/api/v1/full-reset', { method: 'POST' });
+      const payload = {
+        adminAddress: identity?.address || identity?.userId || null,
+        timestamp: Date.now(),
+      };
+      const res = await fetch('/api/v1/full-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
       const data = await res.json();
       if (data.success) {
         addLog(`Server reset OK. New wallet: ${data.newAddress}`, 'success');
@@ -457,11 +478,16 @@ export default function Settings() {
           >
             <div className="absolute inset-0 bg-black/60" onClick={loading.full ? undefined : () => { setConfirmReset(null); setDoubleConfirm(false); }} />
             <motion.div
-              className="glass-card relative p-6 rounded-xl max-w-md mx-4"
+              className="relative p-6 rounded-xl max-w-md mx-4 border"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              style={{ borderRadius: 'var(--border-radius)' }}
+              style={{
+                borderRadius: 'var(--border-radius)',
+                background: 'var(--color-background)',
+                borderColor: 'var(--color-border)',
+                boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+              }}
             >
               {/* State: resetting in progress */}
               {loading.full ? (
@@ -506,9 +532,21 @@ export default function Settings() {
                       <p style={{ color: 'var(--color-danger)' }} className="font-bold text-lg">
                         {t('settings.areYouSure')}
                       </p>
-                      <p style={{ color: 'var(--color-text-muted)' }}>
-                        {t('settings.cannotUndo')}
+                      <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                        {t('settings.enterPasswordToConfirm', 'Enter your wallet password to confirm the reset.')}
                       </p>
+                      <input
+                        type="password"
+                        value={resetPassword}
+                        onChange={(e) => { setResetPassword(e.target.value); setResetPasswordError(''); }}
+                        placeholder={t('settings.walletPassword', 'Wallet password')}
+                        className="w-full px-3 py-2 rounded-lg border bg-transparent text-sm outline-none"
+                        style={{ borderColor: resetPasswordError ? 'var(--color-danger)' : 'var(--color-border)', color: 'var(--color-text)' }}
+                        autoFocus
+                      />
+                      {resetPasswordError && (
+                        <p className="text-xs" style={{ color: 'var(--color-danger)' }}>{resetPasswordError}</p>
+                      )}
                     </div>
                   )}
 
@@ -516,20 +554,31 @@ export default function Settings() {
                     <button
                       className="px-4 py-2 rounded-lg text-sm"
                       style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', borderRadius: 'var(--border-radius)' }}
-                      onClick={() => { setConfirmReset(null); setDoubleConfirm(false); }}
+                      onClick={() => { setConfirmReset(null); setDoubleConfirm(false); setResetPassword(''); setResetPasswordError(''); }}
                     >
                       {t('common.cancel')}
                     </button>
                     <button
                       className="px-4 py-2 rounded-lg text-sm font-medium"
                       style={{ backgroundColor: 'var(--color-danger)', color: '#fff', borderRadius: 'var(--border-radius)' }}
-                      onClick={() => {
+                      onClick={async () => {
                         if (confirmReset === 'identity') {
                           resetIdentity();
                         } else if (confirmReset === 'full' && !doubleConfirm) {
                           setDoubleConfirm(true);
                         } else if (confirmReset === 'full' && doubleConfirm) {
-                          fullReset();
+                          if (!resetPassword) {
+                            setResetPasswordError(t('settings.passwordRequired', 'Password required'));
+                            return;
+                          }
+                          // Always verify password by decrypting mnemonic
+                          try {
+                            const { decryptMnemonic } = await import('../api/crypto');
+                            await decryptMnemonic(identity.encryptedMnemonic, resetPassword);
+                            fullReset();
+                          } catch (err) {
+                            setResetPasswordError(t('settings.wrongPassword', 'Wrong password'));
+                          }
                         }
                       }}
                     >

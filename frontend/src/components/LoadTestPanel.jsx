@@ -23,7 +23,7 @@ function randomText(minLen = 100, maxLen = 800) {
 }
 
 export default function LoadTestPanel() {
-  const { identity, signAndSend } = useIdentity();
+  const { identity, postEvent } = useIdentity();
   const [open, setOpen] = useState(false);
   const [running, setRunning] = useState(false);
   const [logs, setLogs] = useState([]);
@@ -44,12 +44,6 @@ export default function LoadTestPanel() {
 
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-  async function apiCall(method, path, data) {
-    const res = await signAndSend(path, method, data);
-    const json = await res.json().catch(() => ({}));
-    return { ok: res.ok, ...json };
-  }
-
   async function runLoadTest() {
     if (!identity) {
       addLog('Nessuna identità — registrati prima', 'error');
@@ -61,7 +55,7 @@ export default function LoadTestPanel() {
     setStats({ posts: 0, replies: 0, votes: 0, threads: 0, errors: 0 });
     setLogs([]);
 
-    addLog('=== LOAD TEST STARTED ===', 'success');
+    addLog('=== LOAD TEST STARTED (on-chain) ===', 'success');
     addLog(`User: ${identity.userId}`);
 
     // Find categories and threads
@@ -90,6 +84,7 @@ export default function LoadTestPanel() {
     }
 
     const allPostIds = []; // Track all created post IDs for edits/votes
+    const postVersions = {}; // Track versions for edits
     let cycle = 0;
     const startTime = Date.now();
 
@@ -101,20 +96,22 @@ export default function LoadTestPanel() {
       if (cycle % 3 === 1) {
         try {
           const t0 = Date.now();
-          const res = await apiCall('POST', '/api/v1/threads', {
+          const tid = `THR_${Date.now().toString(36).toUpperCase()}`;
+          const result = await postEvent('FORUM_THREAD', tid, {
+            id: tid,
             categoryId,
             title: `Load Test Thread #${cycle} — ${Date.now().toString(36)}`,
             content: randomText(200, 1200),
-          });
+            createdAt: Date.now(),
+          }, 1);
           const elapsed = Date.now() - t0;
-          if (res.success) {
-            const tid = res.id || res.thread?.id;
-            if (tid) threadIds.push(tid);
+          if (result.effects?.status?.status === 'success') {
+            threadIds.push(tid);
             setStats(s => ({ ...s, threads: s.threads + 1 }));
             addLog(`THREAD creato: ${tid} (${elapsed}ms)`, 'success');
           } else {
             setStats(s => ({ ...s, errors: s.errors + 1 }));
-            addLog(`THREAD fallito: ${res.error} (${elapsed}ms)`, 'error');
+            addLog(`THREAD fallito (${elapsed}ms)`, 'error');
           }
         } catch (err) {
           setStats(s => ({ ...s, errors: s.errors + 1 }));
@@ -132,19 +129,24 @@ export default function LoadTestPanel() {
           if (stopRef.current) break;
           try {
             const t0 = Date.now();
-            const res = await apiCall('POST', '/api/v1/posts', {
+            const pid = `POST_${Date.now().toString(36).toUpperCase()}`;
+            const result = await postEvent('FORUM_POST', pid, {
+              id: pid,
               threadId: targetThread,
               parentId: null,
               content: randomText(50, 600),
-            });
+              createdAt: Date.now(),
+            }, 1);
             const elapsed = Date.now() - t0;
-            if (res.success) {
-              if (res.post?.id) { postIds.push(res.post.id); allPostIds.push(res.post.id); }
+            if (result.effects?.status?.status === 'success') {
+              postIds.push(pid);
+              allPostIds.push(pid);
+              postVersions[pid] = 1;
               setStats(s => ({ ...s, posts: s.posts + 1 }));
-              addLog(`POST ${res.post?.id} in ${targetThread} (${elapsed}ms)`, 'success');
+              addLog(`POST ${pid} in ${targetThread} (${elapsed}ms)`, 'success');
             } else {
               setStats(s => ({ ...s, errors: s.errors + 1 }));
-              addLog(`POST fallito: ${res.error} (${elapsed}ms)`, 'error');
+              addLog(`POST fallito (${elapsed}ms)`, 'error');
             }
           } catch (err) {
             setStats(s => ({ ...s, errors: s.errors + 1 }));
@@ -158,18 +160,21 @@ export default function LoadTestPanel() {
           if (stopRef.current) break;
           try {
             const t0 = Date.now();
-            const res = await apiCall('POST', '/api/v1/posts', {
+            const rid = `POST_${Date.now().toString(36).toUpperCase()}`;
+            const result = await postEvent('FORUM_POST', rid, {
+              id: rid,
               threadId: targetThread,
               parentId,
               content: `Reply a ${parentId}: ${randomText(30, 200)}`,
-            });
+              createdAt: Date.now(),
+            }, 1);
             const elapsed = Date.now() - t0;
-            if (res.success) {
+            if (result.effects?.status?.status === 'success') {
               setStats(s => ({ ...s, replies: s.replies + 1 }));
               addLog(`REPLY a ${parentId} (${elapsed}ms)`, 'success');
             } else {
               setStats(s => ({ ...s, errors: s.errors + 1 }));
-              addLog(`REPLY fallito: ${res.error}`, 'error');
+              addLog(`REPLY fallito`, 'error');
             }
           } catch (err) {
             setStats(s => ({ ...s, errors: s.errors + 1 }));
@@ -182,14 +187,17 @@ export default function LoadTestPanel() {
           if (stopRef.current) break;
           try {
             const t0 = Date.now();
-            const res = await apiCall('POST', '/api/v1/vote', {
+            const vid = `VOTE_${Date.now().toString(36).toUpperCase()}`;
+            const result = await postEvent('FORUM_VOTE', vid, {
+              id: vid,
               postId,
               vote: Math.random() > 0.3 ? 1 : -1,
-            });
+              createdAt: Date.now(),
+            }, 1);
             const elapsed = Date.now() - t0;
-            if (res.success) {
+            if (result.effects?.status?.status === 'success') {
               setStats(s => ({ ...s, votes: s.votes + 1 }));
-              addLog(`VOTE su ${postId}: score=${res.score} (${elapsed}ms)`, 'success');
+              addLog(`VOTE su ${postId} (${elapsed}ms)`, 'success');
             } else {
               setStats(s => ({ ...s, errors: s.errors + 1 }));
             }
@@ -206,17 +214,20 @@ export default function LoadTestPanel() {
         if (editTarget && !stopRef.current) {
           try {
             const t0 = Date.now();
-            const res = await apiCall('PUT', `/api/v1/post/${editTarget}`, {
+            const newVersion = (postVersions[editTarget] || 1) + 1;
+            const result = await postEvent('FORUM_POST', editTarget, {
+              id: editTarget,
               content: `**[EDITED v${cycle}]** — ${randomText(50, 300)}`,
-              version: 1,
-            });
+              createdAt: Date.now(),
+            }, newVersion);
             const elapsed = Date.now() - t0;
-            if (res.success) {
+            if (result.effects?.status?.status === 'success') {
+              postVersions[editTarget] = newVersion;
               setStats(s => ({ ...s, edits: (s.edits || 0) + 1 }));
-              addLog(`EDIT ${editTarget} → v${res.post?.version || '?'} (${elapsed}ms)`, 'success');
+              addLog(`EDIT ${editTarget} → v${newVersion} (${elapsed}ms)`, 'success');
             } else {
               setStats(s => ({ ...s, errors: s.errors + 1 }));
-              addLog(`EDIT fallito: ${res.error}`, 'error');
+              addLog(`EDIT fallito`, 'error');
             }
           } catch (err) {
             setStats(s => ({ ...s, errors: s.errors + 1 }));
@@ -231,14 +242,18 @@ export default function LoadTestPanel() {
         if (otherThread && otherThread !== targetThread) {
           try {
             const t0 = Date.now();
-            const res = await apiCall('POST', '/api/v1/posts', {
+            const pid = `POST_${Date.now().toString(36).toUpperCase()}`;
+            const result = await postEvent('FORUM_POST', pid, {
+              id: pid,
               threadId: otherThread,
               parentId: null,
               content: `Cross-thread post da ciclo #${cycle}: ${randomText(40, 250)}`,
-            });
+              createdAt: Date.now(),
+            }, 1);
             const elapsed = Date.now() - t0;
-            if (res.success) {
-              if (res.post?.id) allPostIds.push(res.post.id);
+            if (result.effects?.status?.status === 'success') {
+              allPostIds.push(pid);
+              postVersions[pid] = 1;
               setStats(s => ({ ...s, posts: s.posts + 1 }));
               addLog(`CROSS-POST in ${otherThread} (${elapsed}ms)`, 'success');
             }

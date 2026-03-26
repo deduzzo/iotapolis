@@ -1,16 +1,33 @@
-import { useState } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Home, Send, Lock } from 'lucide-react';
+import { Home, Send, Lock, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useIdentity } from '../hooks/useIdentity';
+import { useRealtimeUpdate } from '../hooks/useWebSocket';
+import { useToast } from '../components/Layout';
 import RichEditor from '../components/RichEditor';
 
 export default function NewThread() {
   const { t } = useTranslation();
   const { id: categoryId } = useParams();
   const navigate = useNavigate();
-  const { identity, signAndSend } = useIdentity();
+  const { identity, postEvent } = useIdentity();
+  const { addToast } = useToast();
+  const pendingThreadRef = useRef(null);
+
+  // Listen for WebSocket: when backend indexes our thread, navigate to it
+  useRealtimeUpdate(
+    useCallback((wsData) => {
+      if (pendingThreadRef.current && wsData.entityId === pendingThreadRef.current) {
+        const threadId = pendingThreadRef.current;
+        pendingThreadRef.current = null;
+        addToast(t('newThread.threadReady', 'Thread pubblicato on-chain!'), 'success');
+        navigate(`/t/${threadId}`);
+      }
+    }, [navigate, addToast, t]),
+    ['thread'],
+  );
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -52,24 +69,31 @@ export default function NewThread() {
 
     setSubmitting(true);
     try {
-      const res = await signAndSend('/api/v1/threads', 'POST', {
-        categoryId,
+      const threadId = `THR_${Date.now().toString(36).toUpperCase()}`;
+      const result = await postEvent('FORUM_THREAD', threadId, {
+        id: threadId,
         title: title.trim(),
         content: content.trim(),
+        categoryId,
         encrypted,
-      });
+        createdAt: Date.now(),
+      }, 1);
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to create thread');
+      if (result.effects?.status?.status !== 'success') {
+        throw new Error('Failed to create thread');
       }
 
-      const data = await res.json();
-      const threadId = data.id || data.thread?.id;
-      navigate(threadId ? `/t/${threadId}` : `/c/${categoryId}`);
+      // Set pending — WebSocket listener will navigate when backend indexes it
+      pendingThreadRef.current = threadId;
+      // Fallback: navigate after 60s even if no WS event
+      setTimeout(() => {
+        if (pendingThreadRef.current === threadId) {
+          pendingThreadRef.current = null;
+          navigate(`/t/${threadId}`);
+        }
+      }, 60000);
     } catch (err) {
       setError(err.message);
-    } finally {
       setSubmitting(false);
     }
   }

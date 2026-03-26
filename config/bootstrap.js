@@ -1,9 +1,14 @@
 /**
- * bootstrap.js — Startup logic for IOTA Free Forum
+ * bootstrap.js — Startup logic for IOTA Free Forum (INDEXER MODE)
  *
- * 1. Initialize SQLite database
- * 2. Initialize IOTA wallet (generate mnemonic on first run)
- * 3. Start blockchain sync in background
+ * The backend is now a pure indexer. It does NOT sign or publish transactions.
+ * Users sign TX directly with their own IOTA wallet.
+ *
+ * 1. Initialize SQLite database (with new payment/marketplace tables)
+ * 2. Initialize IOTA wallet (for faucet operations only)
+ * 3. Start blockchain sync in background (indexer)
+ * 4. Start polling + auto-repair for eventual consistency
+ * 5. Auto-refill faucet wallet on testnet/devnet
  */
 
 const fs = require('fs');
@@ -18,12 +23,14 @@ const CONFIG_PATH = process.env.FORUM_DATA_DIR
 
 /**
  * Auto-generate private_iota_conf.js if it doesn't exist.
- * Creates fresh RSA-2048 keys so the project starts immediately.
+ * In the new architecture, RSA keys are no longer needed for user auth
+ * (users sign with Ed25519 via IOTA SDK). RSA keys are kept for legacy
+ * compatibility but are not used for new operations.
  */
 function ensureConfigFile() {
   if (fs.existsSync(CONFIG_PATH)) return;
 
-  console.log('[bootstrap] private_iota_conf.js not found — generating with fresh keys...');
+  console.log('[bootstrap] private_iota_conf.js not found — generating...');
 
   const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
     modulusLength: 2048,
@@ -53,9 +60,10 @@ module.exports = {
   IOTA_NODE_URL: null,
 
   // Mnemonic BIP39 — generato automaticamente al primo avvio
+  // This wallet is used ONLY for faucet operations (sending gas to new users)
   IOTA_MNEMONIC: null,
 
-  // ── Chiavi RSA-2048 ───────────────────────────────────────────
+  // ── Chiavi RSA-2048 (LEGACY — not used in new architecture) ────
   MAIN_PRIVATE_KEY: '${escPriv}',
   MAIN_PUBLIC_KEY: '${escPub}',
 
@@ -71,7 +79,7 @@ module.exports = {
 `;
 
   fs.writeFileSync(CONFIG_PATH, content, 'utf8');
-  console.log('[bootstrap] private_iota_conf.js created with fresh RSA-2048 keys');
+  console.log('[bootstrap] private_iota_conf.js created');
 
   // Clear require cache so iota.js picks up the new file
   delete require.cache[require.resolve('./private_iota_conf')];
@@ -83,12 +91,12 @@ module.exports.bootstrap = async function (done) {
   // 0. Ensure config file exists
   ensureConfigFile();
 
-  console.log('[bootstrap] Starting IOTA Free Forum bootstrap...');
+  console.log('[bootstrap] Starting IOTA Free Forum bootstrap (INDEXER MODE)...');
 
-  // 1. Initialize SQLite cache
+  // 1. Initialize SQLite cache (with new payment/marketplace tables)
   try {
     db.initDb();
-    console.log('[bootstrap] Step 1/3: SQLite database initialized');
+    console.log('[bootstrap] Step 1/3: SQLite database initialized (including payment tables)');
     log.info('[bootstrap] SQLite database initialized');
   } catch (err) {
     console.log('[bootstrap] FATAL: Failed to initialize database:', err.message);
@@ -96,12 +104,12 @@ module.exports.bootstrap = async function (done) {
     return done(err);
   }
 
-  // 2. Initialize IOTA wallet (best-effort)
+  // 2. Initialize IOTA wallet (used ONLY for faucet operations)
   try {
     const iota = require('../api/utility/iota');
     if (typeof iota.getOrInitWallet === 'function') {
       const walletResult = await iota.getOrInitWallet();
-      console.log('[bootstrap] Step 2/3: IOTA wallet initialized. Address:', walletResult.address || 'N/A');
+      console.log('[bootstrap] Step 2/3: IOTA wallet initialized (faucet only). Address:', walletResult.address || 'N/A');
       log.info('[bootstrap] IOTA wallet:', walletResult.address || 'initialized');
 
       // Wait for gas coins to be available before proceeding
@@ -111,7 +119,7 @@ module.exports.bootstrap = async function (done) {
         if (funds.ready) {
           console.log(`[bootstrap] Wallet funded: ${funds.coins} coins, ${funds.balance} nanos`);
         } else {
-          console.log('[bootstrap] WARNING: Wallet not funded yet. TX will fail until funds arrive.');
+          console.log('[bootstrap] WARNING: Wallet not funded yet. Faucet requests will fail until funds arrive.');
         }
       } else {
         // Existing wallet — quick check
@@ -128,11 +136,10 @@ module.exports.bootstrap = async function (done) {
     log.warn('[bootstrap] IOTA wallet init skipped:', err.message);
   }
 
-  // 3. Start blockchain sync in background (non-blocking)
+  // 3. Start blockchain sync in background (INDEXER — read-only, no publishing)
   try {
     const ForumManager = require('../api/utility/ForumManager');
-    console.log('[bootstrap] Step 3/3: Starting blockchain sync in background...');
-    console.log('[bootstrap] ForumManager type:', typeof ForumManager, 'syncFromBlockchain:', typeof ForumManager.syncFromBlockchain);
+    console.log('[bootstrap] Step 3/3: Starting blockchain sync (indexer mode)...');
     if (typeof ForumManager.syncFromBlockchain === 'function') {
       ForumManager.syncFromBlockchain().then(async () => {
         console.log('[bootstrap] Blockchain sync completed successfully');
@@ -189,22 +196,11 @@ module.exports.bootstrap = async function (done) {
     log.warn('[bootstrap] ForumManager not available, skipping sync');
   }
 
-  // 4. Start retry queue processor (every 30 seconds)
-  try {
-    const ForumManager = require('../api/utility/ForumManager');
-    if (typeof ForumManager.processRetryQueue === 'function') {
-      setInterval(() => {
-        ForumManager.processRetryQueue().catch(err => {
-          console.log('[bootstrap] Retry queue processing error:', err.message);
-        });
-      }, 30000);
-      console.log('[bootstrap] TX retry queue processor started (every 30s)');
-    }
-  } catch (err) {
-    console.log('[bootstrap] Retry queue processor not started:', err.message);
-  }
+  // NOTE: TX retry queue processor REMOVED — backend no longer publishes transactions.
+  // Users sign and submit TX directly to the blockchain with their own wallet.
 
-  // 5. Auto-refill faucet on testnet/devnet when balance is low
+  // 4. Auto-refill faucet wallet on testnet/devnet when balance is low
+  // The faucet wallet is the ONLY thing the backend wallet is used for now.
   try {
     const iota = require('../api/utility/iota');
     const config = require('./private_iota_conf');
@@ -236,12 +232,12 @@ module.exports.bootstrap = async function (done) {
       console.log('[bootstrap] Faucet auto-refill monitor started (testnet/devnet, every 60s)');
     } else {
       console.log(`[bootstrap] Network: ${network} — faucet auto-refill disabled (mainnet)`);
-      console.log('[bootstrap] WARNING: Ensure wallet has sufficient IOTA balance for transactions!');
+      console.log('[bootstrap] WARNING: Ensure faucet wallet has sufficient IOTA balance!');
     }
   } catch (err) {
     console.log('[bootstrap] Faucet monitor not started:', err.message);
   }
 
-  console.log('[bootstrap] Bootstrap complete. Sails is lifting...');
+  console.log('[bootstrap] Bootstrap complete (INDEXER MODE). Sails is lifting...');
   done();
 };

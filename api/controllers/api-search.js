@@ -1,3 +1,9 @@
+/**
+ * api-search.js — Full-text search on threads and posts using SQLite FTS5.
+ *
+ * Updated to handle both IOTA addresses (0x...) and legacy USR_ IDs.
+ */
+
 const db = require('../utility/db');
 
 module.exports = {
@@ -46,7 +52,8 @@ module.exports = {
             const author = Users.findOne({ id: thread.authorId });
             extra = {
               categoryId: thread.categoryId,
-              authorUsername: author?.username || null,
+              authorUsername: (author?.showUsername) ? author.username : null,
+              authorShowUsername: author?.showUsername || 0,
               createdAt: thread.createdAt,
             };
           }
@@ -57,12 +64,21 @@ module.exports = {
             const author = Users.findOne({ id: post.authorId });
             extra = {
               threadId: post.threadId,
-              authorUsername: author?.username || null,
+              authorUsername: (author?.showUsername) ? author.username : null,
+              authorShowUsername: author?.showUsername || 0,
               createdAt: post.createdAt,
             };
           }
-        } else if (id.startsWith('USR_')) {
+        } else if (id.startsWith('USR_') || id.startsWith('0x')) {
+          // User IDs can be legacy USR_ format or new IOTA addresses (0x...)
           type = 'user';
+          const user = Users.findOne({ id });
+          if (user) {
+            extra = {
+              username: user.showUsername ? user.username : null,
+              showUsername: user.showUsername || 0,
+            };
+          }
         }
 
         return {

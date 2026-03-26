@@ -1,138 +1,44 @@
-const crypto = require('crypto');
-const db = require('../utility/db');
-const ForumTags = require('../enums/ForumTags');
+/**
+ * register.js — DEPRECATED
+ *
+ * Registration now happens directly on-chain. Users call register()
+ * on the Move smart contract with their own IOTA wallet.
+ * The backend detects the registration via blockchain event polling
+ * and caches it in SQLite automatically.
+ *
+ * This endpoint is kept for backward compatibility but returns a
+ * deprecation notice directing clients to use on-chain registration.
+ */
 
 module.exports = {
-  friendlyName: 'Register',
-  description: 'Register a new user with RSA keypair identity.',
+  friendlyName: 'Register (Deprecated)',
+  description: 'Registration is now on-chain. This endpoint returns a deprecation notice.',
 
   inputs: {
-    username: { type: 'string', required: true },
-    publicKey: { type: 'string', required: true },
+    username: { type: 'string' },
+    publicKey: { type: 'string' },
     bio: { type: 'string', allowNull: true },
     avatar: { type: 'string', allowNull: true },
-    nonce: { type: 'string', required: true },
-    version: { type: 'number', defaultsTo: 1 },
-    createdAt: { type: 'number', required: true },
-    signature: { type: 'string', required: true },
+    nonce: { type: 'string' },
+    version: { type: 'number' },
+    createdAt: { type: 'number' },
+    signature: { type: 'string' },
   },
 
   exits: {
     success: { statusCode: 200 },
-    badRequest: { statusCode: 400 },
-    conflict: { statusCode: 409 },
+    gone: { statusCode: 410 },
   },
 
-  fn: async function (inputs) {
-    console.log('[register] Incoming request. username:', inputs.username, 'publicKey length:', inputs.publicKey?.length);
-    try {
-      // Verify signature + anti-replay
-      console.log('[register] Calling verifySignature...');
-      const { userId } = await sails.helpers.verifySignature(this.req.body);
-      console.log('[register] Signature verified. userId:', userId);
-
-      // Validate username: 3-20 chars, alphanumeric + underscore
-      const username = inputs.username.trim();
-      if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
-        console.log('[register] Invalid username format:', username);
-        throw 'badRequest';
-      }
-
-      // Check reserved usernames
-      const reserved = ['admin', 'moderator', 'system', 'null', 'undefined'];
-      if (reserved.includes(username.toLowerCase())) {
-        console.log('[register] Reserved username:', username);
-        throw 'badRequest';
-      }
-
-      // Check username uniqueness
-      const Users = db.getModel('users');
-      const existingUsername = Users.findOne({ username });
-      if (existingUsername) {
-        console.log('[register] Username already taken:', username);
-        throw 'conflict';
-      }
-
-      // Check if user already registered with this publicKey
-      const existingUser = Users.findOne({ id: userId });
-      if (existingUser) {
-        console.log('[register] User already registered with this publicKey. userId:', userId);
-        throw 'conflict';
-      }
-
-      // In Move mode, admin is the contract deployer — no auto-admin
-      // In legacy mode, first user in empty DB becomes admin
-      const iota = require('../utility/iota');
-      let isFirstUser = false;
-      let role = 'user';
-      if (!iota.isMoveModeEnabled()) {
-        const allUsers = Users.findAll({});
-        isFirstUser = !allUsers || allUsers.length === 0;
-        role = isFirstUser ? 'admin' : 'user';
-        if (isFirstUser) {
-          console.log('[register] First user (legacy mode) — assigning admin role to', username);
-        }
-      }
-
-      // Publish to blockchain (this also caches in local db via processTransaction)
-      console.log('[register] Publishing to blockchain...');
-      const ForumManager = require('../utility/ForumManager');
-      const txResult = await ForumManager.publishToChain(ForumTags.FORUM_USER, userId, {
-        id: userId,
-        username,
-        bio: inputs.bio || null,
-        avatar: inputs.avatar || null,
-        publicKey: inputs.publicKey,
-        nonce: inputs.nonce,
-        version: 1,
-        createdAt: inputs.createdAt,
-      });
-      console.log('[register] Blockchain publish result:', JSON.stringify(txResult));
-
-      if (!txResult.success) {
-        console.log('[register] TX failed — registration aborted. Error:', txResult.error);
-        this.res.status(503);
-        return {
-          success: false,
-          error: 'Blockchain transaction failed: ' + (txResult.error || 'unknown'),
-          retryQueued: true,
-          digest: txResult.digest || null,
-        };
-      }
-
-      // Update role if admin (processTransaction defaults to 'user')
-      // Do this regardless of verification — the user was created in cache by processTransaction
-      if (isFirstUser) {
-        try { Users.update(userId, { role: 'admin' }); } catch (e) { /* may not exist yet if verification pending */ }
-        console.log('[register] Admin role assigned to first user:', username);
-      }
-
-      const user = Users.findOne({ id: userId });
-
-      // Update search index
-      db.updateFtsIndex(userId, username, inputs.bio || '');
-
-      // Broadcast
-      await sails.helpers.broadcastEvent('dataChanged', {
-        entity: 'user',
-        action: 'userRegistered',
-        label: username,
-        userId,
-      });
-
-      console.log('[register] Registration complete for:', username);
-      return {
-        success: true,
-        user,
-        digest: txResult?.digest || null,
-      };
-    } catch (err) {
-      if (err === 'badRequest') throw 'badRequest';
-      if (err === 'conflict') throw 'conflict';
-      console.log('[register] ERROR:', err.message || err, err.stack || '');
-      sails.log.error('[register]', err.message || err);
-      this.res.status(err.message?.includes('signature') || err.message?.includes('nonce') ? 400 : 500);
-      return { success: false, error: err.message || String(err) };
-    }
+  fn: async function () {
+    this.res.status(410);
+    return {
+      success: false,
+      error: 'Registration endpoint deprecated. Users now register directly on the IOTA blockchain by calling register() on the Move smart contract. The backend automatically detects new registrations via event polling.',
+      migration: {
+        action: 'Use IOTA SDK to call forum::register() directly',
+        docs: '/docs/superpowers/specs/2026-03-26-security-payments-redesign.md',
+      },
+    };
   },
 };

@@ -3,6 +3,9 @@
  *
  * Synchronous, zero-dependency (besides better-sqlite3) local cache.
  * All data is reconstructible from IOTA Tangle — this is just a fast cache.
+ *
+ * User identity is now the IOTA address (e.g. "0x1234...") instead of "USR_" IDs.
+ * The backend is a pure indexer — it does NOT sign or publish transactions.
  */
 
 const Database = require('better-sqlite3');
@@ -32,13 +35,14 @@ function initDb() {
   database.pragma('foreign_keys = ON');
 
   // Create tables
+  // NOTE: users.id is now the IOTA address (e.g. "0x1234..."), not "USR_XXXX"
   database.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
       bio TEXT,
       avatar TEXT,
-      publicKey TEXT NOT NULL,
+      publicKey TEXT DEFAULT '',
       role TEXT DEFAULT 'user',
       showUsername INTEGER DEFAULT 0,
       version INTEGER DEFAULT 1,
@@ -142,6 +146,93 @@ function initDb() {
       content='',
       tokenize='unicode61'
     );
+
+    -- =====================================================================
+    -- New tables for payments, marketplace, escrow, reputation
+    -- =====================================================================
+
+    CREATE TABLE IF NOT EXISTS wallets (
+      address TEXT PRIMARY KEY,
+      userId TEXT,
+      funded INTEGER DEFAULT 0,
+      fundedAt INTEGER,
+      createdAt INTEGER,
+      updatedAt INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      userId TEXT PRIMARY KEY,
+      tier INTEGER DEFAULT 0,
+      expiresAt INTEGER,
+      createdAt INTEGER,
+      updatedAt INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS escrows (
+      id TEXT PRIMARY KEY,
+      buyer TEXT NOT NULL,
+      seller TEXT NOT NULL,
+      arbitrator TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      description TEXT,
+      status INTEGER DEFAULT 0,
+      deadline INTEGER,
+      createdAt INTEGER,
+      resolvedAt INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS reputations (
+      userId TEXT PRIMARY KEY,
+      totalTrades INTEGER DEFAULT 0,
+      successful INTEGER DEFAULT 0,
+      disputesWon INTEGER DEFAULT 0,
+      disputesLost INTEGER DEFAULT 0,
+      totalVolume INTEGER DEFAULT 0,
+      ratingSum INTEGER DEFAULT 0,
+      ratingCount INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS tips (
+      id TEXT PRIMARY KEY,
+      fromUser TEXT NOT NULL,
+      toUser TEXT NOT NULL,
+      postId TEXT,
+      amount INTEGER NOT NULL,
+      createdAt INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS purchases (
+      id TEXT PRIMARY KEY,
+      buyer TEXT NOT NULL,
+      contentId TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      createdAt INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS badges_config (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      price INTEGER DEFAULT 0,
+      icon TEXT,
+      createdAt INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS user_badges (
+      userId TEXT NOT NULL,
+      badgeId TEXT NOT NULL,
+      createdAt INTEGER,
+      PRIMARY KEY(userId, badgeId)
+    );
+
+    CREATE TABLE IF NOT EXISTS ratings (
+      id TEXT PRIMARY KEY,
+      escrowId TEXT NOT NULL,
+      rater TEXT NOT NULL,
+      rated TEXT NOT NULL,
+      score INTEGER NOT NULL,
+      comment TEXT,
+      createdAt INTEGER
+    );
   `);
 
   // Migrations: add columns that may be missing from older DBs
@@ -156,12 +247,23 @@ function initDb() {
     CREATE INDEX IF NOT EXISTS idx_posts_thread ON posts(threadId);
     CREATE INDEX IF NOT EXISTS idx_votes_post ON votes(postId);
     CREATE INDEX IF NOT EXISTS idx_roles_target ON roles(targetUserId);
+    CREATE INDEX IF NOT EXISTS idx_tips_post ON tips(postId);
+    CREATE INDEX IF NOT EXISTS idx_tips_toUser ON tips(toUser);
+    CREATE INDEX IF NOT EXISTS idx_purchases_buyer ON purchases(buyer);
+    CREATE INDEX IF NOT EXISTS idx_purchases_content ON purchases(contentId);
+    CREATE INDEX IF NOT EXISTS idx_escrows_buyer ON escrows(buyer);
+    CREATE INDEX IF NOT EXISTS idx_escrows_seller ON escrows(seller);
+    CREATE INDEX IF NOT EXISTS idx_escrows_status ON escrows(status);
+    CREATE INDEX IF NOT EXISTS idx_ratings_escrow ON ratings(escrowId);
+    CREATE INDEX IF NOT EXISTS idx_user_badges_user ON user_badges(userId);
   `);
 
   // Migrations: add missing columns to existing databases
   const migrations = [
     'ALTER TABLE votes ADD COLUMN updatedAt INTEGER',
     'ALTER TABLE users ADD COLUMN version INTEGER DEFAULT 1',
+    'ALTER TABLE wallets ADD COLUMN createdAt INTEGER',
+    'ALTER TABLE wallets ADD COLUMN updatedAt INTEGER',
   ];
   for (const sql of migrations) {
     try { database.exec(sql); } catch (e) { /* column already exists */ }
@@ -334,7 +436,10 @@ function getCategoryStats() {
       c.*,
       COALESCE(ts.threadCount, 0) as threadCount,
       COALESCE(ts.postCount, 0) as postCount,
-      ts.lastActivity
+      ts.lastActivity,
+      lt.title as lastThreadTitle,
+      CASE WHEN lu.showUsername = 1 THEN lu.username ELSE NULL END as lastAuthor,
+      lu.showUsername as lastAuthorShowUsername
     FROM categories c
     LEFT JOIN (
       SELECT
@@ -346,6 +451,13 @@ function getCategoryStats() {
       WHERE t.hidden = 0
       GROUP BY t.categoryId
     ) ts ON ts.categoryId = c.id
+    LEFT JOIN (
+      SELECT t2.categoryId, t2.title, t2.authorId,
+        ROW_NUMBER() OVER (PARTITION BY t2.categoryId ORDER BY COALESCE(t2.lastPostAt, t2.createdAt) DESC) as rn
+      FROM threads t2
+      WHERE t2.hidden = 0
+    ) lt ON lt.categoryId = c.id AND lt.rn = 1
+    LEFT JOIN users lu ON lt.authorId = lu.id
     ORDER BY c.sortOrder ASC, c.createdAt ASC
   `).all();
 }
@@ -359,9 +471,20 @@ function getThreadsByCategory(categoryId, page = 1, perPage = 20) {
       t.*,
       u.username as authorUsername,
       u.avatar as authorAvatar,
-      u.showUsername as authorShowUsername
+      u.showUsername as authorShowUsername,
+      lp.authorId as lastAuthorId,
+      lu.username as lastAuthorUsername,
+      lu.showUsername as lastAuthorShowUsername
     FROM threads t
     LEFT JOIN users u ON t.authorId = u.id
+    LEFT JOIN (
+      SELECT threadId, authorId
+      FROM posts
+      WHERE hidden = 0
+      GROUP BY threadId
+      HAVING createdAt = MAX(createdAt)
+    ) lp ON lp.threadId = t.id
+    LEFT JOIN users lu ON lp.authorId = lu.id
     WHERE t.categoryId = ? AND t.hidden = 0
     ORDER BY t.pinned DESC, t.lastPostAt DESC, t.createdAt DESC
     LIMIT ? OFFSET ?
