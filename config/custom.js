@@ -1,6 +1,9 @@
+let backendPort = 1337;
+try { backendPort = require('./private_iota_conf').PORT || 1337; } catch (e) {}
+
 module.exports.custom = {
   // Porte: configurate in config/private_iota_conf.js (PORT, FRONTEND_PORT)
-  baseUrl: 'http://localhost:1337',
+  baseUrl: `http://localhost:${backendPort}`,
 
   forumName: 'IOTA Free Forum',
   postsPerPage: 20,
