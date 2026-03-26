@@ -33,6 +33,34 @@ async function main() {
 
   console.log(`[move-publish] Wallet: ${address}`);
 
+  // 1b. Check balance and request faucet if needed
+  const config = require('../../config/private_iota_conf');
+  const network = config.IOTA_NETWORK || 'testnet';
+  const balance = await client.getBalance({ owner: address });
+  const balanceNanos = BigInt(balance.totalBalance || 0);
+  const MIN_BALANCE = BigInt(600_000_000); // 0.6 IOTA minimum for publish
+
+  console.log(`[move-publish] Balance: ${balanceNanos} nanos (${Number(balanceNanos) / 1e9} IOTA)`);
+
+  if (balanceNanos < MIN_BALANCE && (network === 'testnet' || network === 'devnet')) {
+    console.log('[move-publish] Low balance — requesting faucet...');
+    try {
+      await sdk.requestIotaFromFaucetV1({
+        host: sdk.getFaucetHost(network),
+        recipient: address,
+      });
+      // Wait for funds
+      const funds = await iota.waitForFunds(30000);
+      if (funds.ready) {
+        console.log(`[move-publish] Faucet OK: ${funds.balance} nanos`);
+      } else {
+        console.log('[move-publish] WARNING: Faucet funds not yet available, trying anyway...');
+      }
+    } catch (e) {
+      console.log('[move-publish] Faucet request failed:', e.message);
+    }
+  }
+
   // 2. Check compiled bytecode exists
   const buildDir = path.join(MOVE_DIR, 'build', 'IotaFreeForum', 'bytecode_modules');
   if (!fs.existsSync(buildDir)) {
@@ -85,7 +113,7 @@ async function main() {
 
   // Transfer the UpgradeCap to the deployer
   tx.transferObjects([upgradeCap], address);
-  tx.setGasBudget(500_000_000); // 0.5 IOTA — publish can be expensive
+  tx.setGasBudget(200_000_000); // 0.2 IOTA
 
   console.log('[move-publish] Signing and executing publish transaction...');
 
