@@ -414,10 +414,12 @@ async function _publishDataWithRetry(tag, dataObject, entityId = null, version =
   }
 }
 
-// Max chunks per singola TX (1024 comandi - overhead splitCoins batch - transfers)
-const MAX_CHUNKS_PER_TX = 500;
-// Max payload compresso per singola "parte" di una chain (con margine per wrapper)
-const MAX_PART_BYTES = MAX_CHUNKS_PER_TX * CHUNK_DATA_SIZE - 200;
+// V2 encoding: 1 byte per coin, max 500 per splitCoins batch (512 limit - margin)
+// With 2 batches and overhead (marker + length), max ~998 bytes per TX
+// For safety, keep single-TX limit at 490 bytes (one batch)
+const MAX_CHUNKS_PER_TX = 490;
+// Max payload compresso per singola TX (chain-linking if larger)
+const MAX_PART_BYTES = MAX_CHUNKS_PER_TX;
 
 /**
  * Pubblica una singola TX on-chain (senza chain-linking).
@@ -437,16 +439,25 @@ async function _publishSingleTx(marker, payloadBuf) {
   // All amounts: marker + payload length + data chunks
   const allAmounts = [BigInt(marker), BigInt(payloadLength), ...chunks];
 
-  // Single splitCoins from gas coin with all amounts at once
-  const coins = tx.splitCoins(tx.gas, allAmounts.map(a => tx.pure.u64(a)));
-
-  // Transfer each split coin to self (one transferObjects per coin)
-  for (let i = 0; i < allAmounts.length; i++) {
-    tx.transferObjects([coins[i]], tx.pure.address(address));
+  // IOTA 2.0 limit: max 512 arguments per command
+  // Split into batches of 500 to stay under the limit
+  const BATCH_SIZE = 500;
+  const allCoins = [];
+  for (let i = 0; i < allAmounts.length; i += BATCH_SIZE) {
+    const batch = allAmounts.slice(i, i + BATCH_SIZE);
+    const batchCoins = tx.splitCoins(tx.gas, batch.map(a => tx.pure.u64(a)));
+    for (let j = 0; j < batch.length; j++) {
+      allCoins.push(batchCoins[j]);
+    }
   }
 
-  // Gas budget: generous scaling — each split+transfer costs ~2-5M gas units
-  tx.setGasBudget(Math.max(100000000, allAmounts.length * 3000000));
+  // Transfer each split coin to self
+  for (let i = 0; i < allCoins.length; i++) {
+    tx.transferObjects([allCoins[i]], tx.pure.address(address));
+  }
+
+  // Gas budget: generous scaling
+  tx.setGasBudget(Math.max(100000000, allCoins.length * 3000000));
 
   const result = await client.signAndExecuteTransaction({
     signer: keypair,
