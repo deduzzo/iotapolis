@@ -113,18 +113,27 @@ function CategoriesTab() {
     setSubmitting(true);
     try {
       const url = editId
-        ? `/api/v1/category/${editId}`
-        : '/api/v1/category';
+        ? `/api/v1/categories/${editId}`
+        : '/api/v1/categories';
       const method = editId ? 'PUT' : 'POST';
       const res = await signAndSend(url, method, {
         name: name.trim(),
         description: description.trim(),
       });
-      if (!res.ok) throw new Error('Failed');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error('[Admin] Create category failed:', data);
+        alert('Errore: ' + (data.error || res.statusText));
+        return;
+      }
+      console.log('[Admin] Category created:', data);
       setShowForm(false);
+      setName('');
+      setDescription('');
       reload();
     } catch (err) {
-      console.error(err);
+      console.error('[Admin] Error:', err);
+      alert('Errore: ' + err.message);
     } finally {
       setSubmitting(false);
     }
