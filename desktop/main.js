@@ -21,14 +21,20 @@ if (!fs.existsSync(USER_DATA_DIR)) {
 autoUpdater.autoDownload = false; // Don't download until user clicks
 autoUpdater.autoInstallOnAppQuit = true;
 
+function logToRenderer(msg) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.executeJavaScript(`console.log('[electron] ${msg.replace(/'/g, "\\'").replace(/\n/g, ' ')}')`).catch(() => {});
+  }
+}
+
 function sendUpdateEvent(event, data = {}) {
+  logToRenderer(`update event: ${event} ${JSON.stringify(data)}`);
   if (mainWindow && !mainWindow.isDestroyed()) {
     const payload = JSON.stringify({ event, ...data });
-    // Store on window so React can read it even if listener wasn't mounted yet
     mainWindow.webContents.executeJavaScript(`
       window.__latestUpdateEvent = ${payload};
       window.dispatchEvent(new CustomEvent('electron-update', { detail: ${payload} }));
-    `);
+    `).catch(() => {});
   }
 }
 
@@ -259,17 +265,11 @@ app.on('ready', async () => {
 
   // Check for updates at startup (non-blocking)
   setTimeout(() => {
-    console.log('[updater] Checking for updates... isDev:', isDev);
+    logToRenderer('Checking for updates...');
     autoUpdater.checkForUpdates().then((result) => {
-      console.log('[updater] Check result:', result?.updateInfo?.version || 'no update');
+      logToRenderer('Check result: ' + (result?.updateInfo?.version || 'no update info'));
     }).catch((err) => {
-      console.log('[updater] Check failed:', err.message);
-      // Show error in renderer console too
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.executeJavaScript(
-          `console.error('[updater] Check failed: ${err.message.replace(/'/g, "\\'")}')`
-        );
-      }
+      logToRenderer('Check FAILED: ' + err.message);
     });
   }, 5000);
 });
