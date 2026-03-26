@@ -5,6 +5,7 @@ import Modal from './Modal';
 import LoadingSpinner from './LoadingSpinner';
 import { useApi } from '../hooks/useApi';
 import { api } from '../api/endpoints';
+import { useTranslation } from 'react-i18next';
 
 function formatDate(dateStr) {
   if (!dateStr) return '--';
@@ -12,6 +13,7 @@ function formatDate(dateStr) {
 }
 
 export default function EditHistory({ entityType, entityId, isOpen, onClose }) {
+  const { t } = useTranslation();
   const fetcher = useMemo(() => {
     if (entityType === 'post') return () => api.getPostHistory(entityId);
     if (entityType === 'thread') return () => api.getThreadHistory(entityId);
@@ -27,7 +29,7 @@ export default function EditHistory({ entityType, entityId, isOpen, onClose }) {
   );
 
   return (
-    <Modal open={isOpen} onClose={onClose} title="Edit History" wide>
+    <Modal open={isOpen} onClose={onClose} title={t('editHistory.title')} wide>
       {loading && <LoadingSpinner size={24} className="py-8" />}
 
       {error && (
@@ -40,7 +42,7 @@ export default function EditHistory({ entityType, entityId, isOpen, onClose }) {
         <div className="flex flex-col items-center py-8 gap-2">
           <History size={32} style={{ color: 'var(--color-text-muted)' }} />
           <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-            No version history available
+            {t('editHistory.noHistory')}
           </p>
         </div>
       )}
@@ -68,7 +70,7 @@ export default function EditHistory({ entityType, entityId, isOpen, onClose }) {
                   }}
                 >
                   v{ver.version ?? idx + 1}
-                  {idx === 0 && ' (current)'}
+                  {idx === 0 && ` ${t('editHistory.current')}`}
                 </span>
                 <span
                   className="flex items-center gap-1 text-xs"

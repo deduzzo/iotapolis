@@ -82,40 +82,40 @@ export default function EditorToolbar({ editor }) {
       style={{ borderColor: 'var(--color-border)' }}
     >
       {/* Text formatting */}
-      <ToolbarButton icon={Bold} label="Grassetto (Ctrl+B)" isActive={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} />
-      <ToolbarButton icon={Italic} label="Corsivo (Ctrl+I)" isActive={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} />
-      <ToolbarButton icon={Strikethrough} label="Barrato" isActive={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()} />
-      <ToolbarButton icon={Code} label="Codice inline" isActive={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()} />
-      <ToolbarButton icon={Link2} label="Link (Ctrl+K)" isActive={editor.isActive('link')} onClick={setLink} />
+      <ToolbarButton icon={Bold} label={t('editor.bold')} isActive={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} />
+      <ToolbarButton icon={Italic} label={t('editor.italic')} isActive={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} />
+      <ToolbarButton icon={Strikethrough} label={t('editor.strike')} isActive={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()} />
+      <ToolbarButton icon={Code} label={t('editor.code')} isActive={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()} />
+      <ToolbarButton icon={Link2} label={t('editor.link')} isActive={editor.isActive('link')} onClick={setLink} />
 
       <Separator />
 
       {/* Headings */}
-      <ToolbarButton icon={Heading1} label="Titolo 1" isActive={editor.isActive('heading', { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} />
-      <ToolbarButton icon={Heading2} label="Titolo 2" isActive={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} />
-      <ToolbarButton icon={Heading3} label="Titolo 3" isActive={editor.isActive('heading', { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} />
+      <ToolbarButton icon={Heading1} label={t('editor.h1')} isActive={editor.isActive('heading', { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} />
+      <ToolbarButton icon={Heading2} label={t('editor.h2')} isActive={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} />
+      <ToolbarButton icon={Heading3} label={t('editor.h3')} isActive={editor.isActive('heading', { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} />
 
       <Separator />
 
       {/* Structure */}
-      <ToolbarButton icon={Quote} label="Citazione" isActive={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()} />
-      <ToolbarButton icon={Minus} label="Separatore" onClick={() => editor.chain().focus().setHorizontalRule().run()} />
+      <ToolbarButton icon={Quote} label={t('editor.quote')} isActive={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()} />
+      <ToolbarButton icon={Minus} label={t('editor.separator')} onClick={() => editor.chain().focus().setHorizontalRule().run()} />
 
       <Separator />
 
       {/* Lists */}
-      <ToolbarButton icon={List} label="Lista puntata" isActive={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()} />
-      <ToolbarButton icon={ListOrdered} label="Lista numerata" isActive={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()} />
-      <ToolbarButton icon={CheckSquare} label="Checklist" isActive={editor.isActive('taskList')} onClick={() => editor.chain().focus().toggleTaskList().run()} />
+      <ToolbarButton icon={List} label={t('editor.bulletList')} isActive={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()} />
+      <ToolbarButton icon={ListOrdered} label={t('editor.orderedList')} isActive={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()} />
+      <ToolbarButton icon={CheckSquare} label={t('editor.checklist')} isActive={editor.isActive('taskList')} onClick={() => editor.chain().focus().toggleTaskList().run()} />
 
       <Separator />
 
       {/* Code block */}
-      <ToolbarButton icon={FileCode2} label="Blocco codice" isActive={editor.isActive('codeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()} />
+      <ToolbarButton icon={FileCode2} label={t('editor.codeBlock')} isActive={editor.isActive('codeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()} />
 
       {/* Image */}
       <div className="relative" ref={imageRef}>
-        <ToolbarButton icon={Image} label="Immagine" onClick={() => setShowImagePopover((v) => !v)} />
+        <ToolbarButton icon={Image} label={t('editor.image')} onClick={() => setShowImagePopover((v) => !v)} />
         <AnimatePresence>
           {showImagePopover && (
             <ImageInsertPopover
@@ -127,13 +127,13 @@ export default function EditorToolbar({ editor }) {
       </div>
 
       {/* Table */}
-      <ToolbarButton icon={Table2} label="Tabella" onClick={insertTable} />
+      <ToolbarButton icon={Table2} label={t('editor.table')} onClick={insertTable} />
 
       <Separator />
 
       {/* Emoji */}
       <div className="relative" ref={emojiRef}>
-        <ToolbarButton icon={Smile} label="Emoji" onClick={() => setShowEmojiPicker((v) => !v)} />
+        <ToolbarButton icon={Smile} label={t('editor.emoji')} onClick={() => setShowEmojiPicker((v) => !v)} />
         <AnimatePresence>
           {showEmojiPicker && (
             <EmojiPickerPopover
@@ -145,13 +145,13 @@ export default function EditorToolbar({ editor }) {
       </div>
 
       {/* Mention */}
-      <ToolbarButton icon={AtSign} label="Menziona utente" onClick={triggerMention} />
+      <ToolbarButton icon={AtSign} label={t('editor.mention')} onClick={triggerMention} />
 
       <Separator />
 
       {/* Undo/Redo */}
-      <ToolbarButton icon={Undo2} label="Annulla" onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} />
-      <ToolbarButton icon={Redo2} label="Ripeti" onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} />
+      <ToolbarButton icon={Undo2} label={t('editor.undo')} onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} />
+      <ToolbarButton icon={Redo2} label={t('editor.redo')} onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} />
     </div>
   );
 }

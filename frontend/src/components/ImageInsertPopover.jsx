@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Image, X, ExternalLink } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const HOSTING_SERVICES = [
   { name: 'Imgur', url: 'https://imgur.com/upload' },
@@ -9,6 +10,7 @@ const HOSTING_SERVICES = [
 ];
 
 export default function ImageInsertPopover({ onInsert, onClose }) {
+  const { t } = useTranslation();
   const [url, setUrl] = useState('');
   const [alt, setAlt] = useState('');
   const [previewError, setPreviewError] = useState(false);
@@ -37,7 +39,7 @@ export default function ImageInsertPopover({ onInsert, onClose }) {
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--color-text)' }}>
           <Image size={14} style={{ color: 'var(--color-primary)' }} />
-          Inserisci immagine
+          {t('editor.insertImage')}
         </h4>
         <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10">
           <X size={14} style={{ color: 'var(--color-text-muted)' }} />
@@ -63,7 +65,7 @@ export default function ImageInsertPopover({ onInsert, onClose }) {
         type="text"
         value={alt}
         onChange={(e) => setAlt(e.target.value)}
-        placeholder="Descrizione (opzionale)"
+        placeholder={t('editor.descriptionOptional')}
         className="w-full px-3 py-2 rounded-lg text-sm border outline-none mb-3"
         style={{
           background: 'var(--color-background)',
@@ -89,7 +91,7 @@ export default function ImageInsertPopover({ onInsert, onClose }) {
       {/* Hosting suggestions */}
       <div className="mb-3 p-2.5 rounded-lg" style={{ background: 'var(--color-background)' }}>
         <p className="text-xs mb-1.5" style={{ color: 'var(--color-text-muted)' }}>
-          Upload gratis su:
+          {t('editor.freeUpload')}
         </p>
         <div className="flex flex-wrap gap-2">
           {HOSTING_SERVICES.map((s) => (
@@ -107,7 +109,7 @@ export default function ImageInsertPopover({ onInsert, onClose }) {
           ))}
         </div>
         <p className="text-[10px] mt-1.5" style={{ color: 'var(--color-text-muted)' }}>
-          Carica l'immagine, poi incolla il link diretto qui sopra
+          {t('editor.uploadThenPaste')}
         </p>
       </div>
 
@@ -116,7 +118,7 @@ export default function ImageInsertPopover({ onInsert, onClose }) {
         disabled={!isValidUrl}
         className="btn-primary w-full py-2 rounded-lg text-sm disabled:opacity-40"
       >
-        Inserisci
+        {t('editor.insert')}
       </button>
     </motion.div>
   );

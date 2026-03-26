@@ -8,8 +8,10 @@ import { api } from '../api/endpoints';
 import StatsCard from '../components/StatsCard';
 import LoadTestPanel from '../components/LoadTestPanel';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { useTranslation } from 'react-i18next';
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const { data: dashboard, loading, error } = useApi(
     () => api.getDashboard(),
     [],
@@ -45,7 +47,7 @@ export default function Dashboard() {
           className="text-2xl md:text-3xl font-bold neon-text"
           style={{ fontFamily: 'var(--font-heading)' }}
         >
-          Dashboard
+          {t('dashboard.title')}
         </motion.h1>
         <LoadTestPanel />
       </div>
@@ -59,25 +61,25 @@ export default function Dashboard() {
       >
         <StatsCard
           icon={Users}
-          label="Total Users"
+          label={t('dashboard.totalUsers')}
           value={stats.totalUsers ?? 0}
           color="cyan"
         />
         <StatsCard
           icon={FileText}
-          label="Total Threads"
+          label={t('dashboard.totalThreads')}
           value={stats.totalThreads ?? 0}
           color="purple"
         />
         <StatsCard
           icon={MessageSquare}
-          label="Total Posts"
+          label={t('dashboard.totalPosts')}
           value={stats.totalPosts ?? 0}
           color="emerald"
         />
         <StatsCard
           icon={Activity}
-          label="Active (24h)"
+          label={t('dashboard.active24h')}
           value={stats.activeUsers24h ?? 0}
           color="amber"
         />
@@ -95,7 +97,7 @@ export default function Dashboard() {
           style={{ fontFamily: 'var(--font-heading)' }}
         >
           <Database size={20} style={{ color: 'var(--color-primary)' }} />
-          Blockchain Sync Status
+          {t('dashboard.syncStatus')}
         </h2>
 
         {syncStatus ? (() => {
@@ -115,7 +117,7 @@ export default function Dashboard() {
                 style={{ backgroundColor: 'rgba(255,68,68,0.1)', color: 'var(--color-danger)', borderRadius: 'var(--border-radius)' }}
               >
                 <AlertTriangle size={16} />
-                <span><strong>Attenzione:</strong> Bilancio wallet insufficiente su mainnet! Ricarica il wallet per poter pubblicare transazioni.</span>
+                <span><strong>{t('dashboard.warning')}</strong> {t('dashboard.lowBalance')}</span>
               </div>
             )}
             {/* Retry queue warning */}
@@ -125,7 +127,7 @@ export default function Dashboard() {
                 style={{ backgroundColor: 'rgba(255,170,0,0.1)', color: 'var(--color-warning)', borderRadius: 'var(--border-radius)' }}
               >
                 <WifiOff size={16} />
-                <span>{retryQueue.pending} transazioni in coda di retry. {retryQueue.failed > 0 ? `${retryQueue.failed} fallite definitivamente.` : ''}</span>
+                <span>{t('dashboard.retryQueue', { pending: retryQueue.pending, failed: retryQueue.failed })}</span>
               </div>
             )}
             <div className="flex items-center gap-3">
@@ -143,7 +145,7 @@ export default function Dashboard() {
                 }}
               >
                 {isSynced ? <Wifi size={16} /> : <WifiOff size={16} />}
-                {isSynced ? 'Synced' : isSyncing ? 'Syncing...' : isError ? 'Error' : 'Idle'}
+                {isSynced ? t('dashboard.synced') : isSyncing ? t('dashboard.syncing') : isError ? t('dashboard.error') : t('dashboard.idle')}
               </div>
             </div>
 
@@ -153,7 +155,7 @@ export default function Dashboard() {
             >
               <div>
                 <p className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                  Wallet
+                  {t('dashboard.wallet')}
                 </p>
                 <p className="text-sm font-mono font-bold" title={wallet.address || ''}>
                   {wallet.address ? wallet.address.substring(0, 12) + '...' : '--'}
@@ -161,7 +163,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                  Network
+                  {t('dashboard.network')}
                 </p>
                 <p className="text-sm font-mono font-bold">
                   {wallet.network || '--'}
@@ -169,7 +171,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                  Last Sync
+                  {t('dashboard.lastSync')}
                 </p>
                 <p className="text-sm flex items-center gap-1">
                   <Clock size={12} style={{ color: 'var(--color-text-muted)' }} />
@@ -184,7 +186,7 @@ export default function Dashboard() {
         })() : (
           <div className="flex items-center justify-center py-6">
             <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-              Unable to fetch sync status
+              {t('dashboard.fetchError')}
             </p>
           </div>
         )}
