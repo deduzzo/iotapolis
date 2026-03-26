@@ -172,8 +172,6 @@ async function main() {
   _saveToConfig('FORUM_OBJECT_ID', forumObjectId);
   _saveToConfig('ADMIN_CAP_ID', adminCapId);
 
-  const config = require(CONFIG_PATH);
-  const network = config.IOTA_NETWORK || 'testnet';
   const connectionString = `${network}:${packageId}:${forumObjectId}`;
 
   console.log('\n══════════════════════════════════════════════════');
