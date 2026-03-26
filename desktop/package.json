@@ -19,6 +19,8 @@
       "main.js",
       "icons/**"
     ],
+    "npmRebuild": false,
+    "afterPack": "./rebuild-native.js",
     "extraResources": [
       {
         "from": "../",
@@ -39,19 +41,35 @@
     "mac": {
       "category": "public.app-category.social-networking",
       "target": [
-        { "target": "dmg", "arch": ["x64", "arm64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
       "icon": "icons/icon.icns"
     },
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "icons/icon.ico"
     },
     "linux": {
       "target": [
-        { "target": "AppImage", "arch": ["x64"] }
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "icons/icon.png",
       "category": "Network"
@@ -73,6 +91,7 @@
     "electron-updater": "^6.3.0"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.3",
     "electron": "^33.0.0",
     "electron-builder": "^25.0.0"
   }
