@@ -19,7 +19,7 @@ export default function Category() {
     ['thread'],
   );
 
-  const threads = Array.isArray(data) ? data : data?.data || [];
+  const threads = Array.isArray(data) ? data : data?.threads || data?.data || [];
   const totalPages = data?.totalPages ?? 1;
   const categoryName = data?.categoryName ?? threads[0]?.categoryName ?? 'Category';
 
