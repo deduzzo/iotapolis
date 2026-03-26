@@ -348,15 +348,30 @@ async function _mergeAllCoins() {
       await client.waitForTransaction({ digest: result.digest });
       console.log(`[iota] Merge batch ${Math.floor(i / MERGE_BATCH) + 1}: merged ${batch.length} coins`);
 
-      // Update gasCoin version for next batch
+      // Re-fetch the merged coin for next batch (version/digest changed)
       if (i + MERGE_BATCH < others.length) {
         await new Promise(r => setTimeout(r, 500));
-        const refreshed = await client.getCoins({ owner: address, limit: 1 });
-        if (refreshed.data.length > 0) {
-          const largest = refreshed.data.sort((a, b) => (BigInt(b.balance) > BigInt(a.balance) ? 1 : -1))[0];
+        // Fetch all coins and find the largest
+        let refreshedCoins = [];
+        let refCursor = null;
+        let refMore = true;
+        while (refMore) {
+          const refBatch = await client.getCoins({ owner: address, cursor: refCursor });
+          refreshedCoins = refreshedCoins.concat(refBatch.data);
+          refMore = refBatch.hasNextPage;
+          refCursor = refBatch.nextCursor;
+        }
+        if (refreshedCoins.length > 0) {
+          refreshedCoins.sort((a, b) => (BigInt(b.balance) > BigInt(a.balance) ? 1 : -1));
+          const largest = refreshedCoins[0];
           gasCoin.coinObjectId = largest.coinObjectId;
           gasCoin.version = largest.version;
           gasCoin.digest = largest.digest;
+          // Update others list to only include coins not yet merged
+          const mergedIds = new Set(others.slice(0, i + MERGE_BATCH).map(c => c.coinObjectId));
+          const remaining = refreshedCoins.filter(c => c.coinObjectId !== gasCoin.coinObjectId && !mergedIds.has(c.coinObjectId));
+          // Replace remaining batches
+          others.splice(i + MERGE_BATCH, others.length, ...remaining);
         }
       }
     }

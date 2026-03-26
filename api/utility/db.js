@@ -47,7 +47,8 @@ function initDb() {
       description TEXT,
       createdBy TEXT,
       sortOrder INTEGER DEFAULT 0,
-      createdAt INTEGER
+      createdAt INTEGER,
+      updatedAt INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS threads (
