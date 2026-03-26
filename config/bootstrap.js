@@ -31,6 +31,23 @@ module.exports.bootstrap = async function (done) {
       const walletResult = await iota.getOrInitWallet();
       console.log('[bootstrap] Step 2/3: IOTA wallet initialized. Address:', walletResult.address || 'N/A');
       log.info('[bootstrap] IOTA wallet:', walletResult.address || 'initialized');
+
+      // Wait for gas coins to be available before proceeding
+      if (walletResult.init) {
+        console.log('[bootstrap] New wallet — waiting for faucet funds...');
+        const funds = await iota.waitForFunds(30000);
+        if (funds.ready) {
+          console.log(`[bootstrap] Wallet funded: ${funds.coins} coins, ${funds.balance} nanos`);
+        } else {
+          console.log('[bootstrap] WARNING: Wallet not funded yet. TX will fail until funds arrive.');
+        }
+      } else {
+        // Existing wallet — quick check
+        const funds = await iota.waitForFunds(5000);
+        if (!funds.ready) {
+          console.log('[bootstrap] WARNING: No gas coins available. Requesting faucet...');
+        }
+      }
     } else {
       console.log('[bootstrap] Step 2/3: IOTA wallet init skipped (getOrInitWallet not available)');
     }

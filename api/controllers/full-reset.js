@@ -75,10 +75,19 @@ module.exports = {
       iota._resetRuntime();
       console.log('[full-reset] IOTA runtime reset');
 
-      // 5. Re-initialize wallet (request faucet funds)
+      // 5. Re-initialize wallet (request faucet funds) and wait for them
       try {
         const walletResult = await iota.getOrInitWallet();
         console.log('[full-reset] New wallet initialized:', walletResult.address);
+
+        // Wait for faucet funds to arrive (up to 30s)
+        console.log('[full-reset] Waiting for faucet funds...');
+        const funds = await iota.waitForFunds(30000);
+        if (funds.ready) {
+          console.log(`[full-reset] Wallet funded: ${funds.coins} coins`);
+        } else {
+          console.log('[full-reset] WARNING: Funds not yet available. May need to wait.');
+        }
       } catch (e) {
         console.log('[full-reset] Wallet re-init warning:', e.message);
       }

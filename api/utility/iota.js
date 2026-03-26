@@ -198,7 +198,16 @@ async function getOrInitWallet() {
     }
   }
 
-  return { init: true, mnemonic, address };
+  // Wait for faucet funds to arrive
+  console.log(`[iota] Wallet created: ${address}. Waiting for faucet funds...`);
+  const fundsResult = await waitForFunds(30000);
+  if (fundsResult.ready) {
+    console.log(`[iota] Wallet funded: ${fundsResult.coins} coins, ${fundsResult.balance} nanos`);
+  } else {
+    console.log('[iota] WARNING: Faucet funds not yet available');
+  }
+
+  return { init: true, mnemonic, address, funded: fundsResult.ready };
 }
 
 function _saveMnemonicToConfig(mnemonic) {
@@ -239,6 +248,53 @@ async function getStatusAndBalance() {
       error: err.message,
     };
   }
+}
+
+/**
+ * Wait until the wallet has gas coins available.
+ * Polls every 2 seconds for up to maxWaitMs.
+ * On testnet/devnet, requests faucet if balance is 0.
+ */
+async function waitForFunds(maxWaitMs = 30000) {
+  const config = _getConfig();
+  const network = config.IOTA_NETWORK || 'testnet';
+  const isTestnet = network === 'testnet' || network === 'devnet';
+  const start = Date.now();
+
+  console.log(`[iota] Waiting for gas coins... (max ${maxWaitMs / 1000}s)`);
+
+  while (Date.now() - start < maxWaitMs) {
+    try {
+      const client = await getClient();
+      const address = await getAddress();
+      const coins = await client.getCoins({ owner: address });
+
+      if (coins.data && coins.data.length > 0) {
+        const totalBalance = coins.data.reduce((sum, c) => sum + BigInt(c.balance), BigInt(0));
+        console.log(`[iota] Gas coins available: ${coins.data.length} coins, ${totalBalance} nanos`);
+        return { ready: true, coins: coins.data.length, balance: totalBalance.toString() };
+      }
+
+      // No coins — request faucet on testnet
+      if (isTestnet && Date.now() - start < maxWaitMs / 2) {
+        try {
+          const sdk = await loadSdk();
+          await sdk.requestIotaFromFaucetV1({
+            host: sdk.getFaucetHost(network),
+            recipient: address,
+          });
+          console.log('[iota] Faucet requested while waiting for funds');
+        } catch (e) { /* faucet may be rate-limited */ }
+      }
+    } catch (e) {
+      console.log('[iota] waitForFunds check error:', e.message);
+    }
+
+    await new Promise(r => setTimeout(r, 2000));
+  }
+
+  console.log('[iota] waitForFunds: timeout — no gas coins after', maxWaitMs / 1000, 'seconds');
+  return { ready: false };
 }
 
 // --- Pubblicazione dati ---
@@ -764,6 +820,7 @@ module.exports = {
   getByTagFromCache,
   clearBulkCache,
   requestFaucet,
+  waitForFunds,
   GET_MAIN_KEYS,
   getClient,
   getKeypair,
