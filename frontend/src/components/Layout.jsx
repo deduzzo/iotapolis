@@ -3,7 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Home, BarChart3, Fingerprint, ShieldCheck,
-  Search, Wifi, WifiOff, Menu, Settings, Globe,
+  Search, Wifi, WifiOff, Menu, Settings, Globe, Wallet,
 } from 'lucide-react';
 import Sidebar from './Sidebar';
 import IdentityBadge from './IdentityBadge';
@@ -71,6 +71,14 @@ export default function Layout() {
     [],
     ['sync'],
   );
+
+  /* User role (check if admin) */
+  const { data: userProfile } = useApi(
+    () => identity?.userId ? api.getUser(identity.userId) : Promise.resolve(null),
+    [identity?.userId],
+    ['user'],
+  );
+  const isAdmin = userProfile?.role === 'admin';
 
   /* Search */
   const [searchQuery, setSearchQuery] = useState('');
@@ -163,8 +171,29 @@ export default function Layout() {
               </div>
             </form>
 
-            {/* Sync status */}
+            {/* Admin wallet balance + Sync status */}
             <div className="flex items-center gap-2 shrink-0">
+              {isAdmin && syncStatus?.wallet?.balance && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg cursor-pointer"
+                  style={{
+                    color: 'var(--color-primary)',
+                    background: 'rgba(0,240,255,0.08)',
+                  }}
+                  title={`Wallet: ${syncStatus.wallet.address || ''}\nNetwork: ${syncStatus.wallet.network || ''}`}
+                  onClick={() => navigate('/dashboard')}
+                >
+                  <Wallet size={13} />
+                  <span className="hidden md:inline font-mono">
+                    {syncStatus.wallet.balance.replace(/ nanos.*/, '').replace(/\./g, ',')} <span style={{ color: 'var(--color-text-muted)' }}>IOTA</span>
+                  </span>
+                  <span className="md:hidden font-mono">
+                    {syncStatus.wallet.balance.match(/\[(\d+) IOTA\]/)?.[1] || '0'} <span style={{ color: 'var(--color-text-muted)' }}>IOTA</span>
+                  </span>
+                </motion.div>
+              )}
               {syncState && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
