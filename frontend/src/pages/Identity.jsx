@@ -730,11 +730,12 @@ function RegisteredCard({ identity, onExportMnemonic, onImport, onGenerate, onCl
     setPrivacyLoading(true);
     try {
       const newVal = !showUsername;
-      await postEvent('FORUM_CONFIG', identity.address, {
-        type: 'privacy',
+      await postEvent('FORUM_USER', identity.address, {
+        id: identity.address,
+        username: identity.username,
         showUsername: newVal,
-        authorId: identity.address,
-      });
+        createdAt: Date.now(),
+      }, 2);
       setShowUsername(newVal);
     } catch (e) {
       console.error('[Identity] Privacy toggle error:', e);
