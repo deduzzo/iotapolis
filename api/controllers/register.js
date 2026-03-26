@@ -60,12 +60,18 @@ module.exports = {
         throw 'conflict';
       }
 
-      // First user becomes admin automatically
-      const allUsers = Users.findAll({});
-      const isFirstUser = !allUsers || allUsers.length === 0;
-      const role = isFirstUser ? 'admin' : 'user';
-      if (isFirstUser) {
-        console.log('[register] First user — assigning admin role to', username);
+      // In Move mode, admin is the contract deployer — no auto-admin
+      // In legacy mode, first user in empty DB becomes admin
+      const iota = require('../utility/iota');
+      let isFirstUser = false;
+      let role = 'user';
+      if (!iota.isMoveModeEnabled()) {
+        const allUsers = Users.findAll({});
+        isFirstUser = !allUsers || allUsers.length === 0;
+        role = isFirstUser ? 'admin' : 'user';
+        if (isFirstUser) {
+          console.log('[register] First user (legacy mode) — assigning admin role to', username);
+        }
       }
 
       // Publish to blockchain (this also caches in local db via processTransaction)

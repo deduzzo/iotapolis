@@ -1,0 +1,10 @@
+[package]
+name = "IotaFreeForum"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+Iota = { git = "https://github.com/iotaledger/iota.git", subdir = "crates/iota-framework/packages/iota-framework", rev = "mainnet-v1.0.0" }
+
+[addresses]
+forum = "0x0"

@@ -140,10 +140,16 @@ class ForumManager {
     };
 
     try {
-      // Use bulk cache to download all TXs once
+      // Fetch all data — Move events or legacy split-coin TXs
       reportProgress('downloading', 0, 0);
-      syncLog.log('Fetching all transactions from chain (bulk cache)...');
-      const byTag = await iota.getAllTransactionsCached();
+      let byTag;
+      if (iota.isMoveModeEnabled()) {
+        syncLog.log('Fetching forum events from Move contract...');
+        byTag = await iota.queryForumEvents();
+      } else {
+        syncLog.log('Fetching all transactions from chain (legacy bulk cache)...');
+        byTag = await iota.getAllTransactionsCached();
+      }
 
       // Count total TXs across relevant forum tags
       let totalTxs = 0;
@@ -183,8 +189,10 @@ class ForumManager {
         }
       }
 
-      // Free bulk cache
-      iota.clearBulkCache();
+      // Free bulk cache (only needed for legacy mode)
+      if (!iota.isMoveModeEnabled()) {
+        iota.clearBulkCache();
+      }
 
       reportProgress('done', totalTxs, totalTxs);
       syncLog.log(`Sync complete: ${JSON.stringify(stats)}`);
@@ -198,7 +206,7 @@ class ForumManager {
       syncLog.end(false);
       this._syncState = { status: 'error', lastSync: null, error: err.message };
       sails.log.error('[ForumManager] Sync failed:', err);
-      iota.clearBulkCache();
+      if (!iota.isMoveModeEnabled()) iota.clearBulkCache();
       throw err;
     }
   }
@@ -218,7 +226,12 @@ class ForumManager {
     console.log(`[ForumManager] publishToChain called: tag=${tag}, entityId=${entityId}, data=`, JSON.stringify(data).substring(0, 200));
     sails.log.info(`[ForumManager] Publishing ${tag} entityId=${entityId}`);
 
-    const result = await iota.publishData(tag, data, entityId, data.version || 1);
+    let result;
+    if (iota.isMoveModeEnabled()) {
+      result = await iota.publishDataMove(tag, data, entityId, data.version || 1);
+    } else {
+      result = await iota.publishData(tag, data, entityId, data.version || 1);
+    }
 
     if (!result.success) {
       // TX failed — add to retry queue
@@ -441,9 +454,14 @@ class ForumManager {
         updatedAt: data.updatedAt || Date.now(),
       });
     } else {
-      // First user in empty DB becomes admin
-      const allUsers = User.findAll({});
-      const isFirstUser = !allUsers || allUsers.length === 0;
+      // In Move mode, admin is the contract deployer — no auto-admin for first user
+      // In legacy mode, first user in empty DB becomes admin
+      let role = data.role || 'user';
+      if (!iota.isMoveModeEnabled()) {
+        const allUsers = User.findAll({});
+        const isFirstUser = !allUsers || allUsers.length === 0;
+        if (isFirstUser) role = 'admin';
+      }
 
       User.create({
         id: data.id,
@@ -451,7 +469,7 @@ class ForumManager {
         bio: data.bio || null,
         avatar: data.avatar || null,
         publicKey: data.publicKey,
-        role: data.role || (isFirstUser ? 'admin' : 'user'),
+        role,
         showUsername: data.showUsername ? 1 : 0,
         createdAt: data.createdAt || Date.now(),
         updatedAt: data.updatedAt || Date.now(),
@@ -700,7 +718,12 @@ class ForumManager {
    * Returns sorted by version descending (newest first).
    */
   async getEntityHistory(tag, entityId) {
-    const records = await iota.getAllDataByTag(tag, entityId);
+    let records;
+    if (iota.isMoveModeEnabled()) {
+      records = await iota.queryForumEventsByEntity(tag, entityId);
+    } else {
+      records = await iota.getAllDataByTag(tag, entityId);
+    }
 
     const history = records.map(record => {
       let payload;

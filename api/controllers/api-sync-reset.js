@@ -12,7 +12,7 @@ module.exports = {
     success: { statusCode: 200 },
   },
 
-  fn: async function () {
+  fn: async function (inputs) {
     try {
       // Drop all tables and recreate schema
       const database = db.getDb();

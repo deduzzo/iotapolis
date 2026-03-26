@@ -95,36 +95,38 @@ export default function Setup() {
       .catch(() => setLoading(false));
   }, []);
 
-  // Parse connection string
+  // Parse connection string: network:packageId:forumObjectId
   const parseConnectionString = (str) => {
     const trimmed = str.trim();
-    if (trimmed.includes(':') && trimmed.split(':').length === 2) {
-      const [network, address] = trimmed.split(':');
-      return { network, address };
+    const parts = trimmed.split(':');
+    if (parts.length === 3) {
+      return { network: parts[0], packageId: parts[1], forumObjectId: parts[2] };
     }
-    // Assume it's just an address
-    return { network: 'testnet', address: trimmed };
+    if (parts.length === 2 && parts[1].startsWith('0x')) {
+      // Could be network:address (legacy) — try as-is
+      return { network: parts[0], packageId: parts[1], forumObjectId: null };
+    }
+    return { network: connectNetwork, packageId: trimmed, forumObjectId: null };
   };
 
-  // Test connection to a remote forum address
+  // Test connection to a remote forum contract
   const testConnection = async () => {
-    setConnectStatus({ type: 'loading', msg: 'Verificando indirizzo sulla blockchain...' });
+    setConnectStatus({ type: 'loading', msg: 'Verificando contratto sulla blockchain...' });
     try {
-      // We can't directly query another address from the frontend.
-      // Instead, we tell our backend to try reading from that address.
       const res = await fetch('/api/v1/sync-connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          address: connectAddress,
-          network: connectNetwork,
+          connectionString: connectAddress.includes(':')
+            ? connectAddress
+            : `${connectNetwork}:${connectAddress}`,
         }),
       });
       const data = await res.json();
       if (data.success) {
         setConnectStatus({
           type: 'success',
-          msg: `Connesso! Trovate ${data.totalTx || 0} transazioni del forum.`,
+          msg: `Connesso! Trovati ${data.totalEvents || 0} eventi del forum.`,
         });
       } else {
         setConnectStatus({ type: 'error', msg: data.error || 'Impossibile connettersi.' });
@@ -356,19 +358,19 @@ export default function Setup() {
                 Collegati a un forum
               </h2>
               <p className="mb-6 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                Inserisci la stringa di connessione o l'indirizzo del wallet del forum a cui vuoi collegarti.
+                Inserisci la stringa di connessione del forum (network:packageId:forumObjectId).
               </p>
 
               <div className="space-y-4">
                 <div>
                   <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                    Stringa di connessione o indirizzo wallet
+                    Stringa di connessione
                   </label>
                   <input
                     type="text"
                     value={connectAddress}
                     onChange={e => setConnectAddress(e.target.value)}
-                    placeholder="testnet:0x1234...abcd oppure 0x1234...abcd"
+                    placeholder="testnet:0xPACKAGE_ID:0xFORUM_OBJECT_ID"
                     className="w-full p-3 rounded-lg text-sm font-mono"
                     style={{
                       backgroundColor: 'var(--color-background)',
@@ -471,11 +473,11 @@ export default function Setup() {
                 Cosa succede quando ti colleghi
               </h3>
               <ol className="space-y-2 text-sm list-decimal list-inside" style={{ color: 'var(--color-text-muted)' }}>
-                <li>Il tuo server interroga la blockchain IOTA all'indirizzo specificato</li>
-                <li>Scarica tutte le transazioni del forum (post, thread, utenti, voti...)</li>
+                <li>Il tuo server si collega allo smart contract Move del forum</li>
+                <li>Scarica tutti gli eventi (post, thread, utenti, voti...) dalla blockchain</li>
                 <li>Ricostruisce il database locale — puoi navigare tutto il forum</li>
-                <li>Per scrivere, generi la tua identita (chiave RSA) e firmi i tuoi post</li>
-                <li>I post firmati vengono inviati al server master che li pubblica on-chain</li>
+                <li>Per scrivere, registri la tua identita e interagisci direttamente con il contratto</li>
+                <li>Ogni utente paga il proprio gas — su testnet e gratis (faucet)</li>
               </ol>
             </div>
           </motion.div>

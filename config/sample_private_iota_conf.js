@@ -27,6 +27,12 @@ module.exports = {
   MAIN_PRIVATE_KEY: 'YOUR_RSA_PRIVATE_KEY',
   MAIN_PUBLIC_KEY: 'YOUR_RSA_PUBLIC_KEY',
 
+  // ── Move Contract ────────────────────────────────────────────
+  // Set after deploying with: node api/utility/move-publish.js
+  FORUM_PACKAGE_ID: null,
+  FORUM_OBJECT_ID: null,
+  ADMIN_CAP_ID: null,
+
   // ── Explorer ──────────────────────────────────────────────────
   IOTA_EXPLORER_URL: 'https://explorer.rebased.iota.org',
 };

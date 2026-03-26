@@ -17,12 +17,18 @@ module.exports = {
       let address = null;
       let network = null;
       let explorerUrl = null;
+      let packageId = null;
+      let forumObjectId = null;
+      let moveMode = false;
 
       try {
         address = await iota.getAddress();
         const config = require('../../config/private_iota_conf');
         network = config.IOTA_NETWORK || 'testnet';
         explorerUrl = config.IOTA_EXPLORER_URL || null;
+        packageId = config.FORUM_PACKAGE_ID || null;
+        forumObjectId = config.FORUM_OBJECT_ID || null;
+        moveMode = iota.isMoveModeEnabled();
       } catch (e) {
         console.log('[api-forum-info] Could not get wallet info:', e.message);
       }
@@ -38,15 +44,25 @@ module.exports = {
         }
       } catch (e) { /* ignore */ }
 
+      // Connection string: Move mode uses packageId:forumObjectId, legacy uses address
+      let connectionString = null;
+      if (moveMode && packageId && forumObjectId) {
+        connectionString = `${network}:${packageId}:${forumObjectId}`;
+      } else if (address) {
+        connectionString = `${network}:${address}`;
+      }
+
       return {
         success: true,
         forumName,
         address,
         network,
         explorerUrl,
+        packageId,
+        forumObjectId,
+        moveMode,
         version: '0.1.0',
-        // Connection string: everything needed to connect to this forum
-        connectionString: address ? `${network}:${address}` : null,
+        connectionString,
       };
     } catch (err) {
       this.res.status(500);

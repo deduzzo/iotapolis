@@ -958,6 +958,231 @@ async function requestFaucet() {
   return { success: true, address };
 }
 
+// =========================================================================
+// Move contract integration
+// =========================================================================
+
+const ADMIN_TAGS = ['FORUM_ROLE', 'FORUM_MODERATION', 'FORUM_CONFIG'];
+const CLOCK_OBJECT_ID = '0x6';
+
+/**
+ * Check if Move mode is enabled (contract deployed).
+ */
+function isMoveModeEnabled() {
+  const config = _getConfig();
+  return !!(config.FORUM_PACKAGE_ID && config.FORUM_OBJECT_ID);
+}
+
+/**
+ * Get Move contract IDs from config.
+ */
+function _getMoveConfig() {
+  const config = _getConfig();
+  return {
+    packageId: config.FORUM_PACKAGE_ID,
+    forumObjectId: config.FORUM_OBJECT_ID,
+    adminCapId: config.ADMIN_CAP_ID,
+  };
+}
+
+/**
+ * Publish data via Move contract call.
+ * Replaces the legacy split-coins encoding with a proper moveCall.
+ *
+ * @param {string} tag - Forum tag (FORUM_USER, FORUM_POST, etc.)
+ * @param {object} dataObject - The data to publish
+ * @param {string} entityId - Unique entity identifier
+ * @param {number} version - Data version
+ * @returns {{ success, digest, error, explorerUrl }}
+ */
+async function publishDataMove(tag, dataObject, entityId, version = 1) {
+  return _enqueueTx(async () => {
+    try {
+      const sdk = await loadSdk();
+      const client = await getClient();
+      const keypair = await getKeypair();
+      const { packageId, forumObjectId, adminCapId } = _getMoveConfig();
+
+      if (!packageId || !forumObjectId) {
+        throw new Error('Move contract not deployed. Run move-publish.js first.');
+      }
+
+      // Gzip the data payload
+      const jsonStr = JSON.stringify(dataObject);
+      const compressed = zlib.gzipSync(Buffer.from(jsonStr, 'utf8'));
+
+      const config = _getConfig();
+      const network = config.IOTA_NETWORK || 'testnet';
+      const explorerBase = config.IOTA_EXPLORER_URL || 'https://explorer.rebased.iota.org';
+
+      // Build transaction
+      const tx = new sdk.Transaction();
+
+      const isRegistration = tag === 'FORUM_USER' && version === 1;
+      const isAdmin = ADMIN_TAGS.includes(tag);
+
+      if (isRegistration) {
+        // Use register() for new user registration
+        tx.moveCall({
+          target: `${packageId}::forum::register`,
+          arguments: [
+            tx.object(forumObjectId),
+            tx.pure.vector('u8', Array.from(Buffer.from(entityId, 'utf8'))),
+            tx.pure.vector('u8', Array.from(compressed)),
+            tx.object(CLOCK_OBJECT_ID),
+          ],
+        });
+      } else if (isAdmin) {
+        // Use admin_post_event() for admin operations
+        if (!adminCapId) {
+          throw new Error('AdminCap not configured. Only the forum creator can perform admin operations.');
+        }
+        tx.moveCall({
+          target: `${packageId}::forum::admin_post_event`,
+          arguments: [
+            tx.object(forumObjectId),
+            tx.object(adminCapId),
+            tx.pure.vector('u8', Array.from(Buffer.from(tag, 'utf8'))),
+            tx.pure.vector('u8', Array.from(Buffer.from(entityId, 'utf8'))),
+            tx.pure.vector('u8', Array.from(compressed)),
+            tx.pure.u64(version),
+            tx.object(CLOCK_OBJECT_ID),
+          ],
+        });
+      } else {
+        // Use post_event() for regular forum operations
+        tx.moveCall({
+          target: `${packageId}::forum::post_event`,
+          arguments: [
+            tx.object(forumObjectId),
+            tx.pure.vector('u8', Array.from(Buffer.from(tag, 'utf8'))),
+            tx.pure.vector('u8', Array.from(Buffer.from(entityId, 'utf8'))),
+            tx.pure.vector('u8', Array.from(compressed)),
+            tx.pure.u64(version),
+            tx.object(CLOCK_OBJECT_ID),
+          ],
+        });
+      }
+
+      tx.setGasBudget(50_000_000); // 0.05 IOTA — much cheaper than split-coins
+
+      sails.log.info(`[iota] publishDataMove: tag=${tag} entityId=${entityId} json=${jsonStr.length}B gz=${compressed.length}B (-${Math.round((1 - compressed.length / jsonStr.length) * 100)}%)`);
+
+      const result = await client.signAndExecuteTransaction({
+        signer: keypair,
+        transaction: tx,
+        options: { showEffects: true },
+      });
+
+      if (result.effects?.status?.status !== 'success') {
+        const errMsg = result.effects?.status?.error || 'Transaction failed';
+        sails.log.error(`[iota] publishDataMove FAILED: ${errMsg}`);
+        return {
+          success: false,
+          digest: result.digest,
+          error: errMsg,
+          explorerUrl: `${explorerBase}/txblock/${result.digest}?network=${network}`,
+        };
+      }
+
+      sails.log.info(`[iota] publishDataMove OK: ${result.digest}`);
+      return {
+        success: true,
+        digest: result.digest,
+        error: null,
+        explorerUrl: `${explorerBase}/txblock/${result.digest}?network=${network}`,
+      };
+
+    } catch (err) {
+      sails.log.error(`[iota] publishDataMove ERROR: ${err.message}`);
+      return { success: false, digest: null, error: err.message, explorerUrl: null };
+    }
+  });
+}
+
+/**
+ * Query all forum events from the Move contract.
+ * Replaces getAllTransactionsCached() for Move mode.
+ * Returns data partitioned by tag, same format as the legacy function.
+ */
+async function queryForumEvents(remotePackageId = null) {
+  const config = _getConfig();
+  const client = await getClient();
+  const packageId = remotePackageId || config.FORUM_PACKAGE_ID;
+
+  if (!packageId) {
+    throw new Error('FORUM_PACKAGE_ID not configured.');
+  }
+
+  const byTag = {};
+  let cursor = null;
+  let hasMore = true;
+  let totalEvents = 0;
+
+  while (hasMore) {
+    const opts = {
+      query: { MoveModule: { package: packageId, module: 'forum' } },
+      limit: 50,
+      order: 'ascending', // oldest first for correct version ordering
+    };
+    if (cursor) opts.cursor = cursor;
+
+    const result = await client.queryEvents(opts);
+
+    for (const ev of result.data) {
+      try {
+        const parsed = ev.parsedJson;
+        if (!parsed || !parsed.tag) continue;
+
+        const tag = parsed.tag;
+        // Decode gzipped data
+        let payload;
+        try {
+          // parsedJson.data is an array of u8 bytes
+          const dataBytes = Buffer.from(parsed.data);
+          const jsonStr = zlib.gunzipSync(dataBytes).toString('utf8');
+          payload = JSON.parse(jsonStr);
+        } catch (decErr) {
+          // Fallback: data might be uncompressed JSON string
+          payload = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
+        }
+
+        if (!byTag[tag]) byTag[tag] = [];
+        byTag[tag].push({
+          payload,
+          version: parsed.version ? Number(parsed.version) : 1,
+          timestamp: parsed.timestamp ? Number(parsed.timestamp) : null,
+          digest: ev.id?.txDigest,
+          tag,
+          entityId: parsed.entity_id,
+          author: parsed.author,
+        });
+        totalEvents++;
+      } catch (err) {
+        sails.log.warn(`[iota] queryForumEvents: error decoding event:`, err.message);
+      }
+    }
+
+    hasMore = result.hasNextPage;
+    cursor = result.nextCursor;
+  }
+
+  const tagSummary = Object.entries(byTag).map(([t, arr]) => `${t}:${arr.length}`).join(', ');
+  sails.log.info(`[iota] queryForumEvents: ${totalEvents} events, tags: [${tagSummary}]`);
+
+  return byTag;
+}
+
+/**
+ * Query forum events for a specific entity (for history).
+ */
+async function queryForumEventsByEntity(tag, entityId) {
+  const byTag = await queryForumEvents();
+  const records = byTag[tag] || [];
+  if (!entityId) return records;
+  return records.filter(r => String(r.entityId) === String(entityId));
+}
+
 // --- Exports ---
 
 /**
@@ -996,4 +1221,9 @@ module.exports = {
   loadSdk,
   _resetRuntime,
   ASSISTITO_ACCOUNT_PREFIX,
+  // Move contract
+  isMoveModeEnabled,
+  publishDataMove,
+  queryForumEvents,
+  queryForumEventsByEntity,
 };

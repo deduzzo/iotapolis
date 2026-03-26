@@ -139,6 +139,12 @@ function initDb() {
     );
   `);
 
+  // Migrations: add columns that may be missing from older DBs
+  const userCols = database.prepare("PRAGMA table_info(users)").all().map(c => c.name);
+  if (!userCols.includes('showUsername')) {
+    database.exec('ALTER TABLE users ADD COLUMN showUsername INTEGER DEFAULT 0');
+  }
+
   // Create indexes
   database.exec(`
     CREATE INDEX IF NOT EXISTS idx_threads_category ON threads(categoryId);
