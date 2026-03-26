@@ -44,19 +44,36 @@ module.exports = {
         return { success: false, error: 'Invalid action. Must be: ' + validActions.join(', ') };
       }
 
-      // Check post exists
+      // Find target entity (post, thread, or category)
+      const entityId = inputs.postId;
       const Posts = db.getModel('posts');
-      const post = Posts.findOne({ id: inputs.postId });
-      if (!post) {
-        throw 'notFound';
-      }
+      const Threads = db.getModel('threads');
+      const Categories = db.getModel('categories');
 
-      const modId = `MOD_${inputs.postId}_${Date.now()}`;
+      let entity = Posts.findOne({ id: entityId });
+      let entityType = 'post';
+      if (!entity) {
+        entity = Threads.findOne({ id: entityId });
+        entityType = 'thread';
+      }
+      if (!entity) {
+        entity = Categories.findOne({ id: entityId });
+        entityType = 'category';
+      }
+      if (!entity) {
+        console.log('[moderate] Entity not found:', entityId);
+        this.res.status(404);
+        return { success: false, error: `Entity ${entityId} not found` };
+      }
+      console.log('[moderate] Target:', entityType, entityId, 'action:', inputs.action);
+
+      const modId = `MOD_${entityId}_${Date.now()}`;
 
       // Publish to blockchain
       const ForumManager = require('../utility/ForumManager');
       const txResult = await ForumManager.publishToChain(ForumTags.FORUM_MODERATION, modId, {
-        postId: inputs.postId,
+        postId: entityId,
+        entityType,
         action: inputs.action,
         reason: inputs.reason || null,
         moderatorId: userId,
@@ -64,21 +81,26 @@ module.exports = {
         createdAt: inputs.createdAt,
       });
 
-      // Cache moderation record
-      const Moderations = db.getModel('moderations');
-      Moderations.create({
-        id: modId,
-        postId: inputs.postId,
-        action: inputs.action,
-        reason: inputs.reason || null,
-        moderatorId: userId,
-        createdAt: inputs.createdAt,
-      });
+      if (!txResult.success) {
+        this.res.status(503);
+        return { success: false, error: 'TX failed: ' + (txResult.error || 'unknown') };
+      }
 
-      // Update post hidden status
-      Posts.update(inputs.postId, {
-        hidden: inputs.action === 'hide',
-      });
+      // Cache moderation record (publishToChain already does via processTransaction)
+      // Update hidden status on the target entity
+      const hiddenValue = inputs.action === 'hide' ? 1 : 0;
+      if (entityType === 'post') {
+        Posts.update(entityId, { hidden: hiddenValue });
+      } else if (entityType === 'thread') {
+        Threads.update(entityId, { hidden: hiddenValue });
+      } else if (entityType === 'category') {
+        // Categories may not have 'hidden' column yet — use try/catch
+        try {
+          Categories.update(entityId, { hidden: hiddenValue });
+        } catch (e) {
+          console.log('[moderate] Could not update category hidden:', e.message);
+        }
+      }
 
       // Broadcast
       await sails.helpers.broadcastEvent('dataChanged', {

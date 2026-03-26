@@ -47,6 +47,7 @@ function initDb() {
       description TEXT,
       createdBy TEXT,
       sortOrder INTEGER DEFAULT 0,
+      hidden INTEGER DEFAULT 0,
       createdAt INTEGER,
       updatedAt INTEGER
     );
