@@ -43,7 +43,7 @@ export default function Thread() {
     async (postId, direction) => {
       if (!identity) return;
       try {
-        await signAndSend(`/api/v1/post/${postId}/vote`, 'POST', { direction });
+        await signAndSend('/api/v1/vote', 'POST', { postId, direction });
         reload();
       } catch (err) {
         console.error('Vote failed:', err);
@@ -64,7 +64,7 @@ export default function Thread() {
       if (!identity || !content.trim()) return;
       setSubmitting(true);
       try {
-        const res = await signAndSend('/api/v1/post', 'POST', {
+        const res = await signAndSend('/api/v1/posts', 'POST', {
           threadId: id,
           parentId,
           content: content.trim(),

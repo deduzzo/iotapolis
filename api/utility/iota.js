@@ -962,7 +962,7 @@ async function requestFaucet() {
 // Move contract integration
 // =========================================================================
 
-const ADMIN_TAGS = ['FORUM_ROLE', 'FORUM_MODERATION', 'FORUM_CONFIG'];
+const ADMIN_TAGS = ['FORUM_ROLE', 'FORUM_MODERATION', 'FORUM_CONFIG', 'FORUM_CATEGORY'];
 const CLOCK_OBJECT_ID = '0x6';
 
 /**

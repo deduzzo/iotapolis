@@ -29,14 +29,21 @@ let _toastId = 0;
 
 /* ── Forum nav items (same shape as Sidebar expects) ──────────── */
 
-const navItems = [
-  { to: '/', icon: Home, label: 'Home', group: 'Forum' },
-  { to: '/dashboard', icon: BarChart3, label: 'Dashboard', group: 'Forum' },
-  { to: '/identity', icon: Fingerprint, label: 'Identity', group: 'Account' },
-  { to: '/admin', icon: ShieldCheck, label: 'Admin', group: 'Account' },
-  { to: '/settings', icon: Settings, label: 'Impostazioni', group: 'Account' },
-  { to: '/setup', icon: Globe, label: 'Setup / Connetti', group: 'Account' },
-];
+function getNavItems(isAdmin) {
+  const items = [
+    { to: '/', icon: Home, label: 'Home', group: 'Forum' },
+    { to: '/dashboard', icon: BarChart3, label: 'Dashboard', group: 'Forum' },
+    { to: '/identity', icon: Fingerprint, label: 'Identity', group: 'Account' },
+  ];
+  if (isAdmin) {
+    items.push({ to: '/admin', icon: ShieldCheck, label: 'Admin', group: 'Account' });
+  }
+  items.push(
+    { to: '/settings', icon: Settings, label: 'Impostazioni', group: 'Account' },
+    { to: '/setup', icon: Globe, label: 'Setup / Connetti', group: 'Account' },
+  );
+  return items;
+}
 
 /* ── Layout ────────────────────────────────────────────────────── */
 
@@ -172,7 +179,7 @@ export default function Layout() {
           <Sidebar
             collapsed={collapsed}
             onToggle={() => setCollapsed((c) => !c)}
-            navItems={navItems}
+            navItems={getNavItems(isAdmin)}
           />
         </div>
 
@@ -187,7 +194,7 @@ export default function Layout() {
               <Sidebar
                 collapsed={false}
                 onToggle={() => setMobileOpen(false)}
-                navItems={navItems}
+                navItems={getNavItems(isAdmin)}
               />
             </div>
           </div>
@@ -283,19 +290,27 @@ export default function Layout() {
                 </motion.div>
               )}
 
-              {/* Identity badge */}
-              {identity?.username ? (
-                <IdentityBadge
-                  userId={identity.userId}
-                  username={identity.username}
-                  size="sm"
-                />
-              ) : identity ? (
-                <IdentityBadge
-                  userId={identity.userId}
-                  size="sm"
-                />
-              ) : null}
+              {/* Identity badge + role */}
+              {identity && (
+                <div className="flex items-center gap-2">
+                  <IdentityBadge
+                    userId={identity.userId}
+                    username={identity.username}
+                    size="sm"
+                  />
+                  {userProfile?.user?.role && (
+                    <span
+                      className="text-[10px] px-1.5 py-0.5 rounded font-medium uppercase"
+                      style={{
+                        backgroundColor: isAdmin ? 'rgba(255,68,68,0.15)' : 'rgba(0,240,255,0.15)',
+                        color: isAdmin ? 'var(--color-danger)' : 'var(--color-primary)',
+                      }}
+                    >
+                      {userProfile.user.role}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </header>
 
