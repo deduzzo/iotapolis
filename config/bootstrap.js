@@ -6,10 +6,67 @@
  * 3. Start blockchain sync in background
  */
 
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
 const db = require('../api/utility/db');
+
+const CONFIG_PATH = path.resolve(__dirname, 'private_iota_conf.js');
+
+/**
+ * Auto-generate private_iota_conf.js if it doesn't exist.
+ * Creates fresh RSA-2048 keys so the project starts immediately.
+ */
+function ensureConfigFile() {
+  if (fs.existsSync(CONFIG_PATH)) return;
+
+  console.log('[bootstrap] private_iota_conf.js not found — generating with fresh keys...');
+
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+  });
+
+  const escPub = publicKey.replace(/\n/g, '\\n');
+  const escPriv = privateKey.replace(/\n/g, '\\n');
+
+  const content = `// Auto-generated configuration — IOTA Free Forum
+// Generated: ${new Date().toISOString()}
+// DO NOT commit this file (it's in .gitignore)
+
+module.exports = {
+  // Network: 'testnet' | 'mainnet' | 'devnet'
+  IOTA_NETWORK: 'testnet',
+
+  // Custom node URL (null = use network default)
+  IOTA_NODE_URL: null,
+
+  // BIP39 mnemonic for Ed25519 keypair
+  // Auto-generated on first wallet init if null
+  IOTA_MNEMONIC: null,
+
+  // RSA-2048 keys for data encryption
+  MAIN_PRIVATE_KEY: '${escPriv}',
+  MAIN_PUBLIC_KEY: '${escPub}',
+
+  // Explorer URL
+  IOTA_EXPLORER_URL: 'https://explorer.rebased.iota.org',
+};
+`;
+
+  fs.writeFileSync(CONFIG_PATH, content, 'utf8');
+  console.log('[bootstrap] private_iota_conf.js created with fresh RSA-2048 keys');
+
+  // Clear require cache so iota.js picks up the new file
+  delete require.cache[require.resolve('./private_iota_conf')];
+}
 
 module.exports.bootstrap = async function (done) {
   const log = sails.log || console;
+
+  // 0. Ensure config file exists
+  ensureConfigFile();
 
   console.log('[bootstrap] Starting IOTA Free Forum bootstrap...');
 
