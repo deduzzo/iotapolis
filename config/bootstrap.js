@@ -135,17 +135,27 @@ module.exports.bootstrap = async function (done) {
         console.log('[bootstrap] Blockchain sync completed successfully');
         log.info('[bootstrap] Blockchain sync completed');
 
-        // Initialize event cursor after full sync, then start polling
+        // Try real-time subscription first, fall back to polling
         try {
-          await ForumManager.initEventCursor();
-          console.log('[bootstrap] Event cursor initialized — starting blockchain polling (30s)');
-          setInterval(() => {
-            ForumManager.pollNewEvents().catch(err => {
-              sails.log.warn('[poll] Error:', err.message);
-            });
-          }, 30000);
-        } catch (cursorErr) {
-          console.log('[bootstrap] Event cursor init failed:', cursorErr.message);
+          const subscribed = await ForumManager.startRealtimeSubscription();
+          if (subscribed) {
+            console.log('[bootstrap] Real-time blockchain subscription active');
+          } else {
+            throw new Error('Subscription returned false');
+          }
+        } catch (subErr) {
+          console.log('[bootstrap] RT subscription failed, starting polling fallback (30s):', subErr.message);
+          try {
+            await ForumManager.initEventCursor();
+            setInterval(() => {
+              ForumManager.pollNewEvents().catch(err => {
+                sails.log.warn('[poll] Error:', err.message);
+              });
+            }, 30000);
+            console.log('[bootstrap] Blockchain polling started (30s interval)');
+          } catch (cursorErr) {
+            console.log('[bootstrap] Event cursor init failed:', cursorErr.message);
+          }
         }
       }).catch((err) => {
         console.log('[bootstrap] Blockchain sync failed:', err.message);

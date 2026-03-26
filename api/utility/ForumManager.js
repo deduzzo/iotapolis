@@ -768,7 +768,60 @@ class ForumManager {
   }
 
   // -----------------------------------------------------------------------
-  // 6. pollNewEvents — Incremental blockchain polling
+  // 6. Real-time subscription + fallback polling
+  // -----------------------------------------------------------------------
+
+  /**
+   * Subscribe to real-time blockchain events via WebSocket.
+   * Processes each new event immediately and broadcasts dataChanged.
+   * Falls back to polling if subscription fails or is unavailable.
+   */
+  async startRealtimeSubscription() {
+    if (!iota.isMoveModeEnabled()) return;
+
+    try {
+      this._unsubscribe = await iota.subscribeToForumEvents((event) => {
+        try {
+          ensureModels();
+          const data = typeof event.payload === 'string'
+            ? JSON.parse(event.payload)
+            : event.payload;
+
+          // Controlla se l'entità esiste già con la stessa versione (evita duplicati dal nostro stesso nodo)
+          const handlerName = TAG_HANDLERS[event.tag];
+          if (!handlerName) return;
+
+          this.processTransaction(event.tag, data);
+
+          const entity = TAG_ENTITY[event.tag] || event.tag;
+          sails.log.info(`[ForumManager] RT event: ${event.tag} ${event.entityId}`);
+
+          sails.helpers.broadcastEvent('dataChanged', {
+            entity,
+            action: `${entity}Updated`,
+            label: event.entityId,
+            entityId: event.entityId,
+            tag: event.tag,
+            digest: event.digest,
+            ...(data.threadId && { threadId: data.threadId }),
+            ...(data.categoryId && { categoryId: data.categoryId }),
+            ...(data.postId && { postId: data.postId }),
+          }).catch(() => {});
+        } catch (err) {
+          sails.log.warn('[ForumManager] RT event processing error:', err.message);
+        }
+      });
+
+      sails.log.info('[ForumManager] Real-time blockchain subscription active');
+      return true;
+    } catch (err) {
+      sails.log.warn('[ForumManager] Real-time subscription failed, falling back to polling:', err.message);
+      return false;
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // 6b. pollNewEvents — Fallback incremental blockchain polling
   // -----------------------------------------------------------------------
 
   /**

@@ -1284,6 +1284,60 @@ async function queryForumEventsSince(startCursor = null) {
 }
 
 /**
+ * Subscribe to real-time forum events via WebSocket.
+ * Calls onEvent(decodedEvent) for each new event from the smart contract.
+ * Returns an unsubscribe function.
+ *
+ * @param {function} onEvent - callback({ tag, payload, entityId, digest, ... })
+ * @returns {Promise<function>} unsubscribe function
+ */
+async function subscribeToForumEvents(onEvent) {
+  const config = _getConfig();
+  const client = await getClient();
+  const packageId = config.FORUM_PACKAGE_ID;
+
+  if (!packageId) {
+    throw new Error('FORUM_PACKAGE_ID not configured — cannot subscribe.');
+  }
+
+  sails.log.info(`[iota] Subscribing to real-time events for package ${packageId}...`);
+
+  const unsubscribe = await client.subscribeEvent({
+    filter: { MoveModule: { package: packageId, module: 'forum' } },
+    onMessage: (event) => {
+      try {
+        const parsed = event.parsedJson;
+        if (!parsed || !parsed.tag) return;
+
+        let payload;
+        try {
+          const dataBytes = Buffer.from(parsed.data);
+          const jsonStr = zlib.gunzipSync(dataBytes).toString('utf8');
+          payload = JSON.parse(jsonStr);
+        } catch (decErr) {
+          payload = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
+        }
+
+        onEvent({
+          payload,
+          version: parsed.version ? Number(parsed.version) : 1,
+          timestamp: parsed.timestamp ? Number(parsed.timestamp) : null,
+          digest: event.id?.txDigest,
+          tag: parsed.tag,
+          entityId: parsed.entity_id,
+          author: parsed.author,
+        });
+      } catch (err) {
+        sails.log.warn(`[iota] subscribeToForumEvents: error decoding event:`, err.message);
+      }
+    },
+  });
+
+  sails.log.info(`[iota] Subscribed to real-time forum events OK`);
+  return unsubscribe;
+}
+
+/**
  * Query forum events for a specific entity (for history).
  */
 async function queryForumEventsByEntity(tag, entityId) {
@@ -1337,5 +1391,6 @@ module.exports = {
   queryForumEvents,
   queryForumEventsSince,
   queryForumEventsByEntity,
+  subscribeToForumEvents,
   setUserRole,
 };
