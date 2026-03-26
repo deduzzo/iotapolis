@@ -1,9 +1,10 @@
-import { useState, useCallback, createContext, useContext } from 'react';
+import { useState, useCallback, useEffect, createContext, useContext } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Home, BarChart3, Fingerprint, ShieldCheck,
   Search, Wifi, WifiOff, Menu, Settings, Globe, Wallet,
+  Loader2, AlertTriangle, Fuel,
 } from 'lucide-react';
 import Sidebar from './Sidebar';
 import IdentityBadge from './IdentityBadge';
@@ -93,8 +94,78 @@ export default function Layout() {
   const syncState = syncStatus?.sync?.status || null;
   const isSynced = syncState === 'idle' && syncStatus?.sync?.lastSync;
 
+  // Wallet balance check — block the entire site if insufficient
+  const walletBalance = syncStatus?.wallet?.balance || '';
+  const walletNetwork = syncStatus?.wallet?.network || 'testnet';
+  const isTestnet = walletNetwork === 'testnet' || walletNetwork === 'devnet';
+  // Parse balance: "9.999.000.000 nanos [9 IOTA]" → extract IOTA number
+  const iotaMatch = walletBalance.match(/\[(\d+) IOTA\]/);
+  const iotaBalance = iotaMatch ? parseInt(iotaMatch[1]) : null;
+  const isLowBalance = iotaBalance !== null && iotaBalance < 1;
+  const [refuelRequested, setRefuelRequested] = useState(false);
+
+  // Auto-request faucet when balance is low (testnet only)
+  useEffect(() => {
+    if (!isLowBalance || refuelRequested) return;
+    if (!isTestnet) return;
+
+    setRefuelRequested(true);
+    console.log('[Layout] Low balance detected, requesting faucet...');
+    fetch('/api/v1/sync-status').then(r => r.json()).then(() => {
+      // The server-side faucet monitor will handle it
+      // We just trigger a refresh after a delay
+      setTimeout(() => setRefuelRequested(false), 15000);
+    }).catch(() => setTimeout(() => setRefuelRequested(false), 15000));
+  }, [isLowBalance, isTestnet, refuelRequested]);
+
   return (
     <ToastContext.Provider value={{ addToast }}>
+      {/* Low balance blocker modal */}
+      {isLowBalance && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="glass-card p-8 rounded-xl max-w-lg mx-4 text-center"
+            style={{ borderRadius: 'var(--border-radius)' }}
+          >
+            {isTestnet ? (
+              <>
+                <Loader2 size={48} className="animate-spin mx-auto mb-4" style={{ color: 'var(--color-primary)' }} />
+                <h2 className="text-xl font-bold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+                  Ricarica in corso...
+                </h2>
+                <p className="mb-4" style={{ color: 'var(--color-text-muted)' }}>
+                  Il bilancio del wallet e insufficiente ({iotaBalance} IOTA).
+                  Richiesta fondi dal faucet {walletNetwork} in corso.
+                  Il forum sara disponibile appena i fondi arriveranno.
+                </p>
+                <div className="flex items-center justify-center gap-2 text-sm" style={{ color: 'var(--color-warning)' }}>
+                  <Fuel size={16} />
+                  Faucet richiesto automaticamente
+                </div>
+              </>
+            ) : (
+              <>
+                <AlertTriangle size={48} className="mx-auto mb-4" style={{ color: 'var(--color-danger)' }} />
+                <h2 className="text-xl font-bold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+                  Bilancio insufficiente
+                </h2>
+                <p className="mb-4" style={{ color: 'var(--color-text-muted)' }}>
+                  Il wallet del forum ha {iotaBalance} IOTA sulla rete {walletNetwork}.
+                  Per pubblicare transazioni e necessario ricaricare il wallet.
+                </p>
+                <p className="text-sm font-mono p-3 rounded-lg mb-4" style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-primary)' }}>
+                  {syncStatus?.wallet?.address || 'Indirizzo non disponibile'}
+                </p>
+                <p className="text-sm" style={{ color: 'var(--color-danger)' }}>
+                  Invia almeno 1 IOTA a questo indirizzo per ripristinare il funzionamento.
+                </p>
+              </>
+            )}
+          </motion.div>
+        </div>
+      )}
       <div className="flex min-h-screen">
         {/* Desktop sidebar */}
         <div className="hidden md:block">
@@ -171,26 +242,23 @@ export default function Layout() {
               </div>
             </form>
 
-            {/* Admin wallet balance + Sync status */}
+            {/* Wallet balance (visible to all) + Sync status */}
             <div className="flex items-center gap-2 shrink-0">
-              {isAdmin && syncStatus?.wallet?.balance && (
+              {iotaBalance !== null && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg cursor-pointer"
                   style={{
-                    color: 'var(--color-primary)',
-                    background: 'rgba(0,240,255,0.08)',
+                    color: isLowBalance ? 'var(--color-danger)' : 'var(--color-primary)',
+                    background: isLowBalance ? 'rgba(255,68,68,0.1)' : 'rgba(0,240,255,0.08)',
                   }}
-                  title={`Wallet: ${syncStatus.wallet.address || ''}\nNetwork: ${syncStatus.wallet.network || ''}`}
+                  title={`Wallet: ${syncStatus?.wallet?.address || ''}\nNetwork: ${walletNetwork}`}
                   onClick={() => navigate('/dashboard')}
                 >
                   <Wallet size={13} />
-                  <span className="hidden md:inline font-mono">
-                    {syncStatus.wallet.balance.replace(/ nanos.*/, '').replace(/\./g, ',')} <span style={{ color: 'var(--color-text-muted)' }}>IOTA</span>
-                  </span>
-                  <span className="md:hidden font-mono">
-                    {syncStatus.wallet.balance.match(/\[(\d+) IOTA\]/)?.[1] || '0'} <span style={{ color: 'var(--color-text-muted)' }}>IOTA</span>
+                  <span className="font-mono">
+                    {iotaBalance} <span style={{ color: 'var(--color-text-muted)' }}>IOTA</span>
                   </span>
                 </motion.div>
               )}
