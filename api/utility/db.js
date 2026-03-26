@@ -38,6 +38,7 @@ function initDb() {
       publicKey TEXT NOT NULL,
       role TEXT DEFAULT 'user',
       showUsername INTEGER DEFAULT 0,
+      version INTEGER DEFAULT 1,
       createdAt INTEGER,
       updatedAt INTEGER
     );
@@ -154,11 +155,13 @@ function initDb() {
     CREATE INDEX IF NOT EXISTS idx_roles_target ON roles(targetUserId);
   `);
 
-  // Migration: add updatedAt to votes if missing
-  try {
-    database.exec(`ALTER TABLE votes ADD COLUMN updatedAt INTEGER`);
-  } catch (e) {
-    // Column already exists — ignore
+  // Migrations: add missing columns to existing databases
+  const migrations = [
+    'ALTER TABLE votes ADD COLUMN updatedAt INTEGER',
+    'ALTER TABLE users ADD COLUMN version INTEGER DEFAULT 1',
+  ];
+  for (const sql of migrations) {
+    try { database.exec(sql); } catch (e) { /* column already exists */ }
   }
 
   database.exec(`

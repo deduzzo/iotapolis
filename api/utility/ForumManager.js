@@ -461,7 +461,9 @@ class ForumManager {
     const existing = User.findOne({ id: data.id });
 
     if (existing) {
-      // Preserve role if not explicitly set in data (sync doesn't carry roles)
+      // Version-aware: skip if already up to date
+      if (data.version && existing.version && data.version <= existing.version) return;
+
       User.update(data.id, {
         username: data.username,
         bio: data.bio,
@@ -469,6 +471,7 @@ class ForumManager {
         publicKey: data.publicKey,
         role: data.role || existing.role || 'user',
         showUsername: data.showUsername != null ? (data.showUsername ? 1 : 0) : existing.showUsername,
+        version: data.version || (existing.version || 0) + 1,
         updatedAt: data.updatedAt || Date.now(),
       });
     } else {
@@ -947,7 +950,7 @@ class ForumManager {
             const entityId = data.id || record.entityId;
             if (!entityId) continue;
 
-            // Check if entity exists in local cache
+            // Check if entity exists and is up to date
             let model, existing;
             switch (tag) {
               case FORUM_USER: model = User; break;
@@ -955,7 +958,6 @@ class ForumManager {
               case FORUM_THREAD: model = Thread; break;
               case FORUM_POST: model = Post; break;
               case FORUM_VOTE:
-                // Votes: check by id OR by postId+authorId
                 existing = Vote.findOne({ id: entityId });
                 if (!existing && data.postId && data.authorId) {
                   existing = Vote.findOne({ postId: data.postId, authorId: data.authorId });
@@ -971,6 +973,11 @@ class ForumManager {
             if (model) {
               existing = model.findOne({ id: entityId });
               if (!existing) {
+                // Missing entirely — create
+                this.processTransaction(tag, data);
+                repaired++;
+              } else if (data.version && existing.version && data.version > existing.version) {
+                // Outdated version — update
                 this.processTransaction(tag, data);
                 repaired++;
               }
