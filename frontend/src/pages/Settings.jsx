@@ -3,13 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   RotateCcw, Trash2, Database, HardDrive, User,
   AlertTriangle, CheckCircle, Loader2, Download, Bug,
-  ExternalLink, Shield, AlertCircle,
+  ExternalLink, Shield, AlertCircle, Globe,
 } from 'lucide-react';
 import { useIdentity } from '../hooks/useIdentity';
 import { useToast } from '../components/Layout';
 import { useTheme } from '../hooks/useTheme';
 import { themes } from '../data/themes';
 import { Palette, Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { LANGUAGES } from '../i18n';
 
 function ActionCard({ icon: Icon, title, description, buttonText, buttonColor, onAction, loading, danger }) {
   return (
@@ -50,6 +52,7 @@ function ActionCard({ icon: Icon, title, description, buttonText, buttonColor, o
 }
 
 export default function Settings() {
+  const { t, i18n } = useTranslation();
   const { identity, clearIdentity, exportIdentity } = useIdentity();
   const { addToast } = useToast();
   const [loading, setLoading] = useState({});
@@ -185,10 +188,10 @@ export default function Settings() {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>
-          Impostazioni
+          {t('settings.title')}
         </h1>
         <p className="mt-2" style={{ color: 'var(--color-text-muted)' }}>
-          Strumenti di gestione e debug per il forum
+          {t('settings.subtitle')}
         </p>
       </div>
 
@@ -201,10 +204,10 @@ export default function Settings() {
       >
         <h2 className="text-lg font-semibold mb-2 flex items-center gap-2">
           <Palette size={20} style={{ color: 'var(--color-primary)' }} />
-          Tema
+          {t('settings.theme')}
         </h2>
         <p className="text-sm mb-4" style={{ color: 'var(--color-text-muted)' }}>
-          Scegli il tema del forum. La tua scelta sovrascrive il tema predefinito impostato dall'admin.
+          {t('settings.themeDesc')}
         </p>
 
         {/* "Usa default" option */}
@@ -217,18 +220,18 @@ export default function Settings() {
             color: 'var(--color-text)',
           }}
         >
-          <span>Usa tema predefinito del forum</span>
+          <span>{t('settings.useDefault')}</span>
           {!userThemeId && <Check size={16} style={{ color: 'var(--color-primary)' }} />}
         </button>
 
         {/* Theme grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {themes.map((t) => {
-            const isSelected = activeThemeId === t.id;
+          {themes.map((th) => {
+            const isSelected = activeThemeId === th.id;
             return (
               <button
-                key={t.id}
-                onClick={() => setUserTheme(t.id)}
+                key={th.id}
+                onClick={() => setUserTheme(th.id)}
                 className="p-3 rounded-xl border text-left transition-all"
                 style={{
                   borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
@@ -238,21 +241,21 @@ export default function Settings() {
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
-                    {t.name}
+                    {th.name}
                   </span>
                   <span
                     className="text-[10px] px-1.5 py-0.5 rounded-full"
                     style={{
-                      background: t.category === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                      background: th.category === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
                       color: 'var(--color-text-muted)',
                     }}
                   >
-                    {t.category === 'dark' ? 'Dark' : 'Light'}
+                    {th.category === 'dark' ? t('settings.dark') : t('settings.light')}
                   </span>
                 </div>
                 {/* Color preview dots */}
                 <div className="flex gap-1.5">
-                  {[t.base.background, t.base.surface, t.accent.primary, t.accent.secondary, t.accent.success].map((c, i) => (
+                  {[th.base.background, th.base.surface, th.accent.primary, th.accent.secondary, th.accent.success].map((c, i) => (
                     <div
                       key={i}
                       className="w-5 h-5 rounded-full border"
@@ -263,7 +266,7 @@ export default function Settings() {
                 {isSelected && (
                   <div className="mt-2 flex items-center gap-1">
                     <Check size={12} style={{ color: 'var(--color-primary)' }} />
-                    <span className="text-xs" style={{ color: 'var(--color-primary)' }}>Attivo</span>
+                    <span className="text-xs" style={{ color: 'var(--color-primary)' }}>{t('settings.active')}</span>
                   </div>
                 )}
               </button>
@@ -272,29 +275,52 @@ export default function Settings() {
         </div>
       </motion.div>
 
+      {/* Language picker */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-6 rounded-xl" style={{ borderRadius: 'var(--border-radius)' }}>
+        <h2 className="text-lg font-semibold mb-2 flex items-center gap-2">
+          <Globe size={20} style={{ color: 'var(--color-primary)' }} />
+          {t('settings.language')}
+        </h2>
+        <p className="text-sm mb-4" style={{ color: 'var(--color-text-muted)' }}>{t('settings.languageDesc')}</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {LANGUAGES.map((lang) => (
+            <button key={lang.code} onClick={() => i18n.changeLanguage(lang.code)}
+              className="p-2.5 rounded-xl border text-sm text-center transition-all"
+              style={{
+                borderColor: i18n.language?.startsWith(lang.code) ? 'var(--color-primary)' : 'var(--color-border)',
+                background: i18n.language?.startsWith(lang.code) ? 'rgba(0,240,255,0.06)' : 'var(--color-surface)',
+                color: 'var(--color-text)',
+              }}>
+              <span className="text-lg">{lang.flag}</span>
+              <div className="text-xs mt-0.5">{lang.name}</div>
+            </button>
+          ))}
+        </div>
+      </motion.div>
+
       {/* Stato corrente */}
       <div className="glass-card p-6 rounded-xl" style={{ borderRadius: 'var(--border-radius)' }}>
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Database size={20} style={{ color: 'var(--color-primary)' }} />
-          Stato corrente
+          {t('settings.currentStatus')}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
           <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--color-surface)' }}>
-            <span style={{ color: 'var(--color-text-muted)' }}>Identità locale</span>
+            <span style={{ color: 'var(--color-text-muted)' }}>{t('settings.localIdentity')}</span>
             <div className="font-mono mt-1" style={{ color: identity ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
-              {identity ? `${identity.username || 'No username'} (${identity.userId?.substring(0, 12)}...)` : 'Nessuna'}
+              {identity ? `${identity.username || 'No username'} (${identity.userId?.substring(0, 12)}...)` : t('settings.none')}
             </div>
           </div>
           <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--color-surface)' }}>
             <span style={{ color: 'var(--color-text-muted)' }}>localStorage</span>
             <div className="font-mono mt-1">
-              {Object.keys(localStorage).length} chiavi
+              {Object.keys(localStorage).length} {t('settings.keys')}
             </div>
           </div>
           <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--color-surface)' }}>
             <span style={{ color: 'var(--color-text-muted)' }}>Keypair</span>
             <div className="font-mono mt-1" style={{ color: identity?.publicKey ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
-              {identity?.publicKey ? 'RSA-2048 presente' : 'Non generato'}
+              {identity?.publicKey ? t('settings.keypairPresent') : t('settings.notGenerated')}
             </div>
           </div>
         </div>
@@ -325,7 +351,7 @@ export default function Settings() {
             <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>
               <span className="flex items-center gap-1">
                 <CheckCircle size={14} style={{ color: 'var(--color-success)' }} />
-                Contratto attivo su <strong style={{ color: 'var(--color-text)' }}>{forumInfo.network}</strong>
+                {t('settings.contractActive')} <strong style={{ color: 'var(--color-text)' }}>{forumInfo.network}</strong>
               </span>
               {forumInfo.explorerUrl && forumInfo.packageId && (
                 <a
@@ -336,7 +362,7 @@ export default function Settings() {
                   style={{ color: 'var(--color-primary)' }}
                 >
                   <ExternalLink size={12} />
-                  Vedi su Explorer
+                  {t('home.viewOnExplorer')}
                 </a>
               )}
             </div>
@@ -346,10 +372,10 @@ export default function Settings() {
             <AlertCircle size={20} style={{ color: 'var(--color-warning)' }} />
             <div>
               <p className="text-sm font-medium" style={{ color: 'var(--color-warning)' }}>
-                Contratto non deployato
+                {t('settings.contractNotDeployed')}
               </p>
               <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                Esegui <code style={{ color: 'var(--color-text)' }}>npm run move:deploy</code> per deployare lo smart contract e abilitare il forum.
+                {t('home.runInTerminal')} <code style={{ color: 'var(--color-text)' }}>npm run move:deploy</code>
               </p>
             </div>
           </div>
@@ -360,14 +386,14 @@ export default function Settings() {
       <div className="space-y-4">
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <HardDrive size={20} style={{ color: 'var(--color-primary)' }} />
-          Azioni
+          {t('settings.actions')}
         </h2>
 
         <ActionCard
           icon={Download}
-          title="Esporta dati"
-          description="Scarica un dump JSON di tutti i dati nel database SQLite del server."
-          buttonText="Esporta"
+          title={t('settings.exportData')}
+          description={t('settings.exportDataDesc')}
+          buttonText={t('settings.export')}
           onAction={exportData}
           loading={loading.export}
         />
@@ -375,45 +401,45 @@ export default function Settings() {
         {identity && (
           <ActionCard
             icon={Download}
-            title="Esporta identità"
-            description="Salva le chiavi RSA e l'username in un file JSON per backup o migrazione su altro dispositivo."
-            buttonText="Esporta"
+            title={t('settings.exportIdentity')}
+            description={t('settings.exportIdentityDesc')}
+            buttonText={t('settings.export')}
             onAction={exportIdentity}
           />
         )}
 
         <ActionCard
           icon={RotateCcw}
-          title="Risincronizza dalla blockchain"
-          description="Svuota il database locale e riscarica tutti i dati dalla blockchain. Utile se il DB locale è corrotto o incompleto."
-          buttonText="Risincronizza"
+          title={t('settings.resync')}
+          description={t('settings.resyncDesc')}
+          buttonText={t('settings.resyncBtn')}
           onAction={resyncFromChain}
           loading={loading.resync}
         />
 
         <ActionCard
           icon={Database}
-          title="Reset cache server"
-          description="Svuota il database SQLite locale senza risincronizzare. Il database resterà vuoto fino alla prossima risincronizzazione."
-          buttonText="Reset Cache"
+          title={t('settings.resetCache')}
+          description={t('settings.resetCacheDesc')}
+          buttonText={t('settings.resetCacheBtn')}
           onAction={resetCache}
           loading={loading.cache}
         />
 
         <ActionCard
           icon={User}
-          title="Cancella identità locale"
-          description="Rimuove il keypair RSA e l'username dal browser. Potrai generarne uno nuovo o importarne uno esistente."
-          buttonText="Cancella"
+          title={t('settings.deleteIdentity')}
+          description={t('settings.deleteIdentityDesc')}
+          buttonText={t('settings.deleteBtn')}
           danger
           onAction={() => setConfirmReset('identity')}
         />
 
         <ActionCard
           icon={Trash2}
-          title="Reset totale"
-          description="Genera un NUOVO wallet IOTA (nuovo indirizzo), nuove chiavi RSA server, svuota tutto. Dovrai ri-deployare lo smart contract con `npm run move:deploy`. I vecchi dati on-chain restano sul vecchio contratto."
-          buttonText="Reset Totale"
+          title={t('settings.fullReset')}
+          description={t('settings.fullResetDesc')}
+          buttonText={t('settings.fullResetBtn')}
           danger
           onAction={() => setConfirmReset('full')}
           loading={loading.full}
@@ -441,9 +467,9 @@ export default function Settings() {
               {loading.full ? (
                 <div className="text-center py-4">
                   <Loader2 size={40} className="animate-spin mx-auto mb-4" style={{ color: 'var(--color-primary)' }} />
-                  <h3 className="text-lg font-bold mb-2">Reset in corso...</h3>
+                  <h3 className="text-lg font-bold mb-2">{t('settings.resetInProgress')}</h3>
                   <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                    Generazione nuovo wallet, richiesta fondi dal faucet, pulizia database. Non chiudere questa pagina.
+                    {t('settings.resetInProgressDesc')}
                   </p>
                 </div>
               ) : (
@@ -451,27 +477,26 @@ export default function Settings() {
                   <div className="flex items-center gap-3 mb-4">
                     <AlertTriangle size={24} style={{ color: 'var(--color-danger)' }} />
                     <h3 className="text-lg font-bold">
-                      {confirmReset === 'full' && doubleConfirm ? 'Ultima conferma' : 'Conferma'}
+                      {confirmReset === 'full' && doubleConfirm ? t('settings.finalConfirmation') : t('settings.confirm')}
                     </h3>
                   </div>
 
                   {confirmReset === 'identity' && (
                     <p className="mb-6" style={{ color: 'var(--color-text-muted)' }}>
-                      Sei sicuro di voler cancellare la tua identita locale? Se non hai un backup, perderai l'accesso al tuo account.
+                      {t('settings.deleteIdentityConfirm')}
                     </p>
                   )}
 
                   {confirmReset === 'full' && !doubleConfirm && (
                     <div className="mb-6 space-y-3">
                       <p style={{ color: 'var(--color-danger)' }} className="font-semibold">
-                        Operazione distruttiva e irreversibile!
+                        {t('settings.destructiveWarning')}
                       </p>
                       <p style={{ color: 'var(--color-text-muted)' }}>
-                        Questo genera un <strong style={{ color: 'var(--color-text)' }}>nuovo wallet IOTA</strong> con un nuovo indirizzo.
-                        Tutti i dati locali verranno cancellati. Il forum riparte completamente da zero.
+                        {t('settings.fullResetWarning')}
                       </p>
                       <p style={{ color: 'var(--color-text-muted)' }}>
-                        I vecchi dati on-chain restano sulla blockchain al vecchio indirizzo, ma non saranno piu associati a questa istanza.
+                        {t('settings.oldDataWarning')}
                       </p>
                     </div>
                   )}
@@ -479,11 +504,10 @@ export default function Settings() {
                   {confirmReset === 'full' && doubleConfirm && (
                     <div className="mb-6 space-y-3">
                       <p style={{ color: 'var(--color-danger)' }} className="font-bold text-lg">
-                        Sei davvero sicuro?
+                        {t('settings.areYouSure')}
                       </p>
                       <p style={{ color: 'var(--color-text-muted)' }}>
-                        Non potrai annullare questa operazione. Il vecchio wallet e tutti i dati locali andranno persi definitivamente.
-                        Assicurati di aver esportato tutto cio che ti serve.
+                        {t('settings.cannotUndo')}
                       </p>
                     </div>
                   )}
@@ -494,7 +518,7 @@ export default function Settings() {
                       style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', borderRadius: 'var(--border-radius)' }}
                       onClick={() => { setConfirmReset(null); setDoubleConfirm(false); }}
                     >
-                      Annulla
+                      {t('common.cancel')}
                     </button>
                     <button
                       className="px-4 py-2 rounded-lg text-sm font-medium"
@@ -509,7 +533,7 @@ export default function Settings() {
                         }
                       }}
                     >
-                      {confirmReset === 'identity' ? 'Conferma' : confirmReset === 'full' && !doubleConfirm ? 'Continua' : 'Conferma Reset Totale'}
+                      {confirmReset === 'identity' ? t('settings.confirm') : confirmReset === 'full' && !doubleConfirm ? t('settings.continue') : t('settings.confirmFullReset')}
                     </button>
                   </div>
                 </>
@@ -523,13 +547,13 @@ export default function Settings() {
       <div className="glass-card p-6 rounded-xl" style={{ borderRadius: 'var(--border-radius)' }}>
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Bug size={20} style={{ color: 'var(--color-primary)' }} />
-          Log operazioni
+          {t('settings.operationLog')}
         </h2>
         <div
           className="font-mono text-xs space-y-1 max-h-64 overflow-y-auto p-3 rounded-lg"
           style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-text-muted)' }}
         >
-          {logs.length === 0 && <div>Nessuna operazione eseguita</div>}
+          {logs.length === 0 && <div>{t('settings.noOperations')}</div>}
           {logs.map((log, i) => (
             <div key={i} className="flex gap-2">
               <span style={{ color: 'var(--color-text-muted)' }}>{log.ts}</span>

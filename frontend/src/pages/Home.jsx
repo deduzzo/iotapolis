@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Folder, MessageSquare, FileText, Clock, Plus, Share2, Copy, CheckCircle, X, ExternalLink, Globe, Shield, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useApi } from '../hooks/useApi';
 import { useRealtimeUpdate } from '../hooks/useWebSocket';
 import { useIdentity } from '../hooks/useIdentity';
@@ -35,6 +36,7 @@ function formatTime(dateStr) {
 }
 
 export default function Home() {
+  const { t } = useTranslation();
   const { identity } = useIdentity();
   const { data: categories, loading, error, setData: setCategories } = useApi(
     () => api.getCategories(),
@@ -144,19 +146,19 @@ export default function Home() {
         </div>
         <div>
           <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
-            Smart Contract non deployato
+            {t('home.contractNotDeployed')}
           </h2>
           <p style={{ color: 'var(--color-text-muted)' }}>
-            Per usare il forum devi prima deployare lo smart contract Move sulla blockchain IOTA.
+            {t('home.contractNotDeployedDesc')}
           </p>
         </div>
         <div className="glass-card p-4 rounded-xl w-full text-left" style={{ borderRadius: 'var(--border-radius)' }}>
-          <p className="text-sm font-medium mb-2">Esegui nel terminale:</p>
+          <p className="text-sm font-medium mb-2">{t('home.runInTerminal')}</p>
           <code className="block p-3 rounded-lg text-sm font-mono" style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-primary)' }}>
             npm run move:deploy
           </code>
           <p className="text-xs mt-2" style={{ color: 'var(--color-text-muted)' }}>
-            Poi riavvia il server con <code style={{ color: 'var(--color-text)' }}>npm run dev</code>
+            {t('home.thenRestart')} <code style={{ color: 'var(--color-text)' }}>npm run dev</code>
           </p>
         </div>
       </div>
@@ -168,7 +170,7 @@ export default function Home() {
       <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4">
         <Folder size={48} style={{ color: 'var(--color-text-muted)' }} />
         <p className="text-lg" style={{ color: 'var(--color-text-muted)' }}>
-          Nessuna categoria
+          {t('home.noCategories')}
         </p>
         {isAdmin ? (
           <Link
@@ -181,11 +183,11 @@ export default function Home() {
             }}
           >
             <Plus size={18} />
-            Crea la prima categoria
+            {t('home.createFirstCategory')}
           </Link>
         ) : (
           <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-            Un amministratore deve creare la prima categoria.
+            {t('home.adminMustCreate')}
           </p>
         )}
       </div>
@@ -210,7 +212,7 @@ export default function Home() {
           className="text-2xl md:text-3xl font-bold neon-text"
           style={{ fontFamily: 'var(--font-heading)' }}
         >
-          Categories
+          {t('home.categories')}
         </motion.h1>
 
         {forumInfo?.connectionString && (
@@ -229,7 +231,7 @@ export default function Home() {
             }}
           >
             <Share2 size={16} />
-            <span className="hidden sm:inline">Condividi Forum</span>
+            <span className="hidden sm:inline">{t('home.shareForum')}</span>
           </motion.button>
         )}
       </div>
@@ -247,9 +249,9 @@ export default function Home() {
             className="grid grid-cols-[1fr_auto_auto] md:grid-cols-[1fr_120px_200px] gap-2 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider"
             style={{ background: 'var(--color-primary)', color: 'var(--color-background)' }}
           >
-            <span>Forum</span>
-            <span className="text-center hidden md:block">Stats</span>
-            <span className="hidden md:block">Ultimo post</span>
+            <span>{t('home.forum')}</span>
+            <span className="text-center hidden md:block">{t('home.stats')}</span>
+            <span className="hidden md:block">{t('home.lastPost')}</span>
           </div>
 
           {list.map((cat, idx) => {
@@ -282,10 +284,10 @@ export default function Home() {
                   </div>
                   <div className="text-center hidden md:block">
                     <div className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
-                      {cat.threadCount ?? 0} <span className="text-xs font-normal" style={{ color: 'var(--color-text-muted)' }}>topics</span>
+                      {cat.threadCount ?? 0} <span className="text-xs font-normal" style={{ color: 'var(--color-text-muted)' }}>{t('home.topics')}</span>
                     </div>
                     <div className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
-                      {cat.postCount ?? 0} <span className="text-xs font-normal" style={{ color: 'var(--color-text-muted)' }}>replies</span>
+                      {cat.postCount ?? 0} <span className="text-xs font-normal" style={{ color: 'var(--color-text-muted)' }}>{t('home.replies')}</span>
                     </div>
                   </div>
                   <div className="hidden md:flex items-center gap-2.5">
@@ -298,7 +300,7 @@ export default function Home() {
                     <div className="min-w-0">
                       <p className="text-xs truncate" style={{ color: 'var(--color-text)' }}>{cat.lastThreadTitle || '--'}</p>
                       <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
-                        {cat.lastAuthor ? `By ${cat.lastAuthor}` : ''} {formatTime(cat.lastActivity)}
+                        {cat.lastAuthor ? `${t('home.by')} ${cat.lastAuthor}` : ''} {formatTime(cat.lastActivity)}
                       </p>
                     </div>
                   </div>
@@ -350,8 +352,8 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-4 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                    <span className="flex items-center gap-1"><FileText size={12} />{cat.threadCount ?? 0} threads</span>
-                    <span className="flex items-center gap-1"><MessageSquare size={12} />{cat.postCount ?? 0} posts</span>
+                    <span className="flex items-center gap-1"><FileText size={12} />{cat.threadCount ?? 0} {t('home.threads')}</span>
+                    <span className="flex items-center gap-1"><MessageSquare size={12} />{cat.postCount ?? 0} {t('home.posts')}</span>
                     <span className="flex items-center gap-1"><Clock size={12} />{formatTime(cat.lastActivity)}</span>
                     <span onClick={e => e.preventDefault()}>
                       <BlockchainInfo entityType="category" entityId={cat.id} />
@@ -390,7 +392,7 @@ export default function Home() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
                   <Share2 size={20} style={{ color: 'var(--color-primary)' }} />
-                  Condividi questo forum
+                  {t('home.shareTitle')}
                 </h3>
                 <button onClick={() => setShowShare(false)} className="p-1 rounded-lg hover:bg-white/10">
                   <X size={18} style={{ color: 'var(--color-text-muted)' }} />
@@ -398,13 +400,13 @@ export default function Home() {
               </div>
 
               <p className="mb-4 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                Chiunque puo collegarsi a questo forum con le informazioni qui sotto. I dati sono pubblici sulla blockchain IOTA.
+                {t('home.shareDesc')}
               </p>
 
               {/* Connection string */}
               <div className="mb-4">
                 <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--color-text-muted)' }}>
-                  Stringa di connessione
+                  {t('home.connectionString')}
                 </label>
                 <div className="flex items-center gap-2">
                   <code
@@ -428,7 +430,7 @@ export default function Home() {
                 <div className="mb-4 space-y-2">
                   <div>
                     <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                      Package ID (Smart Contract)
+                      {t('home.packageId')}
                     </label>
                     <code className="block p-2 rounded-lg text-xs font-mono break-all"
                       style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-primary)' }}>
@@ -437,7 +439,7 @@ export default function Home() {
                   </div>
                   <div>
                     <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                      Forum Object ID
+                      {t('home.forumObjectId')}
                     </label>
                     <code className="block p-2 rounded-lg text-xs font-mono break-all"
                       style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-primary)' }}>
@@ -448,7 +450,7 @@ export default function Home() {
               ) : (
                 <div className="mb-4">
                   <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--color-text-muted)' }}>
-                    Indirizzo wallet IOTA
+                    {t('home.walletAddress')}
                   </label>
                   <code className="block p-3 rounded-lg text-xs font-mono break-all"
                     style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-primary)' }}>
@@ -461,7 +463,7 @@ export default function Home() {
               <div className="flex items-center justify-between mb-5">
                 <span className="text-xs flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
                   <Globe size={12} />
-                  Network: <strong style={{ color: 'var(--color-text)' }}>{forumInfo.network}</strong>
+                  {t('home.network')}: <strong style={{ color: 'var(--color-text)' }}>{forumInfo.network}</strong>
                   {forumInfo.moveMode && <span className="ml-1 px-1.5 py-0.5 rounded text-[10px]"
                     style={{ backgroundColor: 'rgba(0,240,255,0.15)', color: 'var(--color-primary)' }}>Move</span>}
                 </span>
@@ -474,7 +476,7 @@ export default function Home() {
                     style={{ color: 'var(--color-primary)' }}
                   >
                     <ExternalLink size={12} />
-                    Vedi su Explorer
+                    {t('home.viewOnExplorer')}
                   </a>
                 )}
               </div>
@@ -483,15 +485,15 @@ export default function Home() {
               <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--color-background)', borderRadius: 'var(--border-radius)' }}>
                 <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
                   <Shield size={14} style={{ color: 'var(--color-primary)' }} />
-                  Come collegarsi
+                  {t('home.howToConnect')}
                 </h4>
                 <ol className="text-xs space-y-1.5 list-decimal list-inside" style={{ color: 'var(--color-text-muted)' }}>
-                  <li>L'utente installa il progetto IOTA Free Forum sul proprio PC</li>
-                  <li>Avvia il server con <code style={{ color: 'var(--color-text)' }}>npm run dev</code></li>
-                  <li>Alla schermata di setup, sceglie <strong style={{ color: 'var(--color-text)' }}>"Collegati a un forum esistente"</strong></li>
-                  <li>Incolla la stringa di connessione: <code style={{ color: 'var(--color-success)' }}>{forumInfo.connectionString?.substring(0, 40)}...</code></li>
-                  <li>Il sistema si collega allo smart contract e scarica tutti gli eventi</li>
-                  <li>Registra la propria identita e interagisce direttamente con la blockchain</li>
+                  <li>{t('home.step1')}</li>
+                  <li>{t('home.step2')} <code style={{ color: 'var(--color-text)' }}>npm run dev</code></li>
+                  <li>{t('home.step3')} <strong style={{ color: 'var(--color-text)' }}>"{t('home.step3bold')}"</strong></li>
+                  <li>{t('home.step4')} <code style={{ color: 'var(--color-success)' }}>{forumInfo.connectionString?.substring(0, 40)}...</code></li>
+                  <li>{t('home.step5')}</li>
+                  <li>{t('home.step6')}</li>
                 </ol>
               </div>
             </motion.div>

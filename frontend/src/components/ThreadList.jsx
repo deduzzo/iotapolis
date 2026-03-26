@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Pin, Lock, MessageSquare, Clock } from 'lucide-react';
 import IdentityBadge from './IdentityBadge';
+import { useTranslation } from 'react-i18next';
 
 const container = {
   hidden: { opacity: 0 },
@@ -36,6 +37,7 @@ function sortThreads(threads) {
    IPB Table layout
    ═══════════════════════════════════════════════════════════════════ */
 function TableLayout({ sorted, freshThreadIds }) {
+  const { t } = useTranslation();
   return (
     <motion.div
       variants={container} initial="hidden" animate="show"
@@ -46,9 +48,9 @@ function TableLayout({ sorted, freshThreadIds }) {
         className="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_100px_180px] gap-2 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider"
         style={{ background: 'var(--color-primary)', color: 'var(--color-background)' }}
       >
-        <span>Topic</span>
-        <span className="text-center hidden md:block">Replies</span>
-        <span className="hidden md:block">Ultimo post</span>
+        <span>{t('threadList.topic')}</span>
+        <span className="text-center hidden md:block">{t('threadList.replies')}</span>
+        <span className="hidden md:block">{t('threadList.lastPost')}</span>
       </div>
 
       <AnimatePresence>
@@ -78,7 +80,7 @@ function TableLayout({ sorted, freshThreadIds }) {
                         {thread.pinned && (
                           <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full shrink-0"
                             style={{ backgroundColor: 'var(--color-success)', color: 'var(--color-background)' }}>
-                            <Pin size={8} /> Pin
+                            <Pin size={8} /> {t('threadList.pin')}
                           </span>
                         )}
                         {thread.locked && (
@@ -97,7 +99,7 @@ function TableLayout({ sorted, freshThreadIds }) {
                   </div>
                   <div className="text-center hidden md:block">
                     <div className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>{thread.postCount ?? 0}</div>
-                    <div className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>replies</div>
+                    <div className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{t('threadList.replies').toLowerCase()}</div>
                   </div>
                   <div className="hidden md:flex items-center gap-2">
                     <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
@@ -106,7 +108,7 @@ function TableLayout({ sorted, freshThreadIds }) {
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>
-                        By {thread.lastAuthorName || thread.authorName || thread.authorId?.slice(0, 10)}
+                        {t('threadList.by')} {thread.lastAuthorName || thread.authorName || thread.authorId?.slice(0, 10)}
                       </p>
                       <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
                         <Clock size={10} className="inline mr-0.5" />
@@ -132,6 +134,7 @@ function TableLayout({ sorted, freshThreadIds }) {
    Default cards layout
    ═══════════════════════════════════════════════════════════════════ */
 function CardsLayout({ sorted, freshThreadIds }) {
+  const { t } = useTranslation();
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-3">
       <AnimatePresence>
@@ -155,13 +158,13 @@ function CardsLayout({ sorted, freshThreadIds }) {
                         {thread.pinned && (
                           <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full shrink-0"
                             style={{ backgroundColor: 'var(--color-success)', color: 'var(--color-background)' }}>
-                            <Pin size={10} /> Pinned
+                            <Pin size={10} /> {t('threadList.pin')}
                           </span>
                         )}
                         {thread.locked && (
                           <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full shrink-0"
                             style={{ backgroundColor: 'var(--color-warning)', color: 'var(--color-background)' }}>
-                            <Lock size={10} /> Locked
+                            <Lock size={10} /> {t('threadList.locked')}
                           </span>
                         )}
                         <h3 className="font-semibold text-sm md:text-base truncate">{thread.title}</h3>
@@ -191,12 +194,13 @@ function CardsLayout({ sorted, freshThreadIds }) {
    Main export
    ═══════════════════════════════════════════════════════════════════ */
 export default function ThreadList({ threads, freshThreadIds, layout = 'cards' }) {
+  const { t } = useTranslation();
   if (!threads || threads.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
         <MessageSquare size={40} style={{ color: 'var(--color-text-muted)' }} />
         <p className="mt-3 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-          No threads yet. Be the first to start a discussion!
+          {t('threadList.noThreads')}
         </p>
       </div>
     );

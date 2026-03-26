@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, Send, Lock } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useIdentity } from '../hooks/useIdentity';
 import RichEditor from '../components/RichEditor';
 
 export default function NewThread() {
+  const { t } = useTranslation();
   const { id: categoryId } = useParams();
   const navigate = useNavigate();
   const { identity, signAndSend } = useIdentity();
@@ -21,14 +23,14 @@ export default function NewThread() {
       <div className="max-w-2xl mx-auto py-8">
         <div className="glass-card text-center">
           <p style={{ color: 'var(--color-text-muted)' }}>
-            You need an identity to create a thread.
+            {t('newThread.needIdentity')}
           </p>
           <Link
             to="/identity"
             className="inline-block mt-3 text-sm underline"
             style={{ color: 'var(--color-primary)' }}
           >
-            Generate Identity
+            {t('newThread.generateIdentity')}
           </Link>
         </div>
       </div>
@@ -40,11 +42,11 @@ export default function NewThread() {
     setError('');
 
     if (!title.trim()) {
-      setError('Title is required');
+      setError(t('newThread.titleRequired'));
       return;
     }
     if (!content.trim()) {
-      setError('Content is required');
+      setError(t('newThread.contentRequired'));
       return;
     }
 
@@ -85,7 +87,7 @@ export default function NewThread() {
           style={{ color: 'var(--color-primary)' }}
         >
           <Home size={14} />
-          Home
+          {t('common.home')}
         </Link>
         <span>/</span>
         <Link
@@ -93,10 +95,10 @@ export default function NewThread() {
           className="hover:underline"
           style={{ color: 'var(--color-primary)' }}
         >
-          Category
+          {t('common.category')}
         </Link>
         <span>/</span>
-        <span>New Thread</span>
+        <span>{t('newThread.title')}</span>
       </nav>
 
       <motion.h1
@@ -105,7 +107,7 @@ export default function NewThread() {
         className="text-2xl font-bold mb-6 neon-text"
         style={{ fontFamily: 'var(--font-heading)' }}
       >
-        New Thread
+        {t('newThread.title')}
       </motion.h1>
 
       <form onSubmit={handleSubmit}>
@@ -120,13 +122,13 @@ export default function NewThread() {
               className="block text-sm font-medium mb-1.5"
               style={{ color: 'var(--color-text-muted)' }}
             >
-              Title
+              {t('newThread.titleLabel')}
             </label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Thread title..."
+              placeholder={t('newThread.titlePlaceholder')}
               maxLength={200}
               className="w-full px-4 py-3 rounded-xl border bg-transparent outline-none text-base transition-colors"
               style={{
@@ -144,12 +146,12 @@ export default function NewThread() {
               className="block text-sm font-medium mb-1.5"
               style={{ color: 'var(--color-text-muted)' }}
             >
-              Content
+              {t('newThread.contentLabel')}
             </label>
             <RichEditor
               value={content}
               onChange={setContent}
-              placeholder="Scrivi il contenuto del thread..."
+              placeholder={t('newThread.contentPlaceholder')}
               minHeight="200px"
             />
           </div>
@@ -181,7 +183,7 @@ export default function NewThread() {
             <div className="flex items-center gap-2">
               <Lock size={14} style={{ color: 'var(--color-text-muted)' }} />
               <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                Encrypt content (only authorized users can read)
+                {t('newThread.encrypt')}
               </span>
             </div>
           </label>
@@ -208,7 +210,7 @@ export default function NewThread() {
               className="btn-primary flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold disabled:opacity-40"
             >
               <Send size={16} />
-              {submitting ? 'Creating...' : 'Create Thread'}
+              {submitting ? t('newThread.creating') : t('newThread.createThread')}
             </motion.button>
           </div>
         </motion.div>

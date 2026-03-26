@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Plus, ChevronLeft, ChevronRight, Home } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useApi } from '../hooks/useApi';
 import { useTheme } from '../hooks/useTheme';
 import { useRealtimeUpdate } from '../hooks/useWebSocket';
@@ -11,6 +12,7 @@ import ThreadList from '../components/ThreadList';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 export default function Category() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const { identity } = useIdentity();
   const [page, setPage] = useState(1);
@@ -117,7 +119,7 @@ export default function Category() {
       <nav className="flex items-center gap-2 text-sm mb-4" style={{ color: 'var(--color-text-muted)' }}>
         <Link to="/" className="flex items-center gap-1 hover:underline" style={{ color: 'var(--color-primary)' }}>
           <Home size={14} />
-          Home
+          {t('common.home')}
         </Link>
         <span>/</span>
         <span>{categoryName}</span>
@@ -142,7 +144,7 @@ export default function Category() {
               className="btn-primary flex items-center gap-2 px-4 py-2 rounded-xl text-sm"
             >
               <Plus size={16} />
-              New Thread
+              {t('category.newThread')}
             </motion.button>
           </Link>
         )}
@@ -163,10 +165,10 @@ export default function Category() {
             style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}
           >
             <ChevronLeft size={16} />
-            Prev
+            {t('category.prev')}
           </motion.button>
           <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-            Page {page} of {totalPages}
+            {t('category.pageOf', { page, total: totalPages })}
           </span>
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -176,7 +178,7 @@ export default function Category() {
             className="flex items-center gap-1 px-3 py-2 rounded-xl border text-sm transition-colors disabled:opacity-30"
             style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}
           >
-            Next
+            {t('category.next')}
             <ChevronRight size={16} />
           </motion.button>
         </div>

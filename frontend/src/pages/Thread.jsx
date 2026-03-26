@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, Clock, Edit3, Lock, History, Save, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useApi } from '../hooks/useApi';
 import { useRealtimeUpdate } from '../hooks/useWebSocket';
 import { useTheme } from '../hooks/useTheme';
@@ -23,6 +24,7 @@ function formatDate(dateStr) {
 }
 
 export default function Thread() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const { identity, signAndSend } = useIdentity();
   const { activeThemeId } = useTheme();
@@ -311,7 +313,7 @@ export default function Thread() {
   if (!thread) {
     return (
       <div className="flex items-center justify-center min-h-[40vh]">
-        <p style={{ color: 'var(--color-text-muted)' }}>Thread not found</p>
+        <p style={{ color: 'var(--color-text-muted)' }}>{t('thread.threadNotFound')}</p>
       </div>
     );
   }
@@ -332,7 +334,7 @@ export default function Thread() {
           style={{ color: 'var(--color-primary)' }}
         >
           <Home size={14} />
-          Home
+          {t('common.home')}
         </Link>
         <span>/</span>
         {thread.categoryId && (
@@ -376,7 +378,7 @@ export default function Thread() {
                   }}
                 >
                   <Lock size={10} />
-                  Locked
+                  {t('thread.locked')}
                 </span>
               )}
               <h1
@@ -410,7 +412,7 @@ export default function Thread() {
                   style={{ color: 'var(--color-warning)' }}
                 >
                   <Edit3 size={12} />
-                  Modified {formatDate(thread.updatedAt)}
+                  {t('thread.modified')} {formatDate(thread.updatedAt)}
                 </button>
               )}
             </div>
@@ -418,17 +420,17 @@ export default function Thread() {
             {/* Content or edit form */}
             {editingOP ? (
               <div className="mb-3">
-                <RichEditor value={editOPContent} onChange={setEditOPContent} placeholder="Modifica il thread..." minHeight="150px" />
+                <RichEditor value={editOPContent} onChange={setEditOPContent} placeholder={t('thread.editThread')} minHeight="150px" />
                 <div className="flex items-center gap-2 mt-2 justify-end">
                   <button onClick={() => setEditingOP(false)}
                     className="px-3 py-1.5 rounded-lg text-xs border transition-colors hover:bg-white/5"
                     style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>
-                    <X size={12} className="inline mr-1" />Annulla
+                    <X size={12} className="inline mr-1" />{t('thread.cancel')}
                   </button>
                   <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                     onClick={handleEditOP} disabled={editOPSubmitting || !editOPContent.trim()}
                     className="btn-primary px-4 py-1.5 rounded-lg text-xs disabled:opacity-40">
-                    <Save size={12} className="inline mr-1" />{editOPSubmitting ? 'Salvataggio...' : 'Salva'}
+                    <Save size={12} className="inline mr-1" />{editOPSubmitting ? t('thread.saving') : t('thread.save')}
                   </motion.button>
                 </div>
               </div>
@@ -447,7 +449,7 @@ export default function Thread() {
                   style={{ color: 'var(--color-primary)' }}
                 >
                   <Edit3 size={12} />
-                  Edit
+                  {t('thread.edit')}
                 </button>
               )}
               <button
@@ -456,7 +458,7 @@ export default function Thread() {
                 style={{ color: 'var(--color-text-muted)' }}
               >
                 <History size={12} />
-                Storico{thread.version > 1 && ` (v${thread.version})`}
+                {t('thread.history')}{thread.version > 1 && ` (v${thread.version})`}
               </button>
               <BlockchainInfo entityType="thread" entityId={thread.id} />
             </div>
@@ -470,7 +472,7 @@ export default function Thread() {
           className="text-lg font-bold mb-4"
           style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-text-muted)' }}
         >
-          Replies ({posts.length})
+          {t('thread.replies', { count: posts.length })}
         </h2>
 
         <NestedReplies
@@ -504,12 +506,12 @@ export default function Thread() {
             className="text-sm font-semibold mb-3"
             style={{ color: 'var(--color-text-muted)' }}
           >
-            Post a Reply
+            {t('thread.postReply')}
           </h3>
           <RichEditor
             value={replyContent}
             onChange={setReplyContent}
-            placeholder="Scrivi la tua risposta..."
+            placeholder={t('thread.writeReply')}
           />
           <div className="flex justify-end mt-3">
             <motion.button
@@ -519,7 +521,7 @@ export default function Thread() {
               disabled={submitting || !replyContent.trim()}
               className="btn-primary px-5 py-2 rounded-xl text-sm disabled:opacity-40"
             >
-              {submitting ? 'Posting...' : 'Post Reply'}
+              {submitting ? t('thread.postingReply') : t('thread.postReply')}
             </motion.button>
           </div>
         </motion.div>
@@ -531,7 +533,7 @@ export default function Thread() {
           style={{ color: 'var(--color-text-muted)' }}
         >
           <Lock size={18} className="inline mr-2" />
-          This thread is locked. No new replies can be posted.
+          {t('thread.threadLocked')}
         </div>
       )}
 

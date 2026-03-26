@@ -14,6 +14,7 @@ import { useTheme } from '../hooks/useTheme';
 import { useIdentity } from '../hooks/useIdentity';
 import { useApi } from '../hooks/useApi';
 import { api } from '../api/endpoints';
+import { useTranslation } from 'react-i18next';
 
 /* ── Toast context ─────────────────────────────────────────────── */
 
@@ -29,18 +30,18 @@ let _toastId = 0;
 
 /* ── Forum nav items (same shape as Sidebar expects) ──────────── */
 
-function getNavItems(isAdmin) {
+function getNavItems(isAdmin, t) {
   const items = [
-    { to: '/', icon: Home, label: 'Home', group: 'Forum' },
-    { to: '/dashboard', icon: BarChart3, label: 'Dashboard', group: 'Forum' },
-    { to: '/identity', icon: Fingerprint, label: 'Identity', group: 'Account' },
+    { to: '/', icon: Home, label: t('nav.home'), group: 'Forum' },
+    { to: '/dashboard', icon: BarChart3, label: t('nav.dashboard'), group: 'Forum' },
+    { to: '/identity', icon: Fingerprint, label: t('nav.identity'), group: 'Account' },
   ];
   if (isAdmin) {
-    items.push({ to: '/admin', icon: ShieldCheck, label: 'Admin', group: 'Account' });
+    items.push({ to: '/admin', icon: ShieldCheck, label: t('nav.admin'), group: 'Account' });
   }
   items.push(
-    { to: '/settings', icon: Settings, label: 'Impostazioni', group: 'Account' },
-    { to: '/setup', icon: Globe, label: 'Setup / Connetti', group: 'Account' },
+    { to: '/settings', icon: Settings, label: t('nav.settings'), group: 'Account' },
+    { to: '/setup', icon: Globe, label: t('nav.setup'), group: 'Account' },
   );
   return items;
 }
@@ -48,6 +49,7 @@ function getNavItems(isAdmin) {
 /* ── Layout ────────────────────────────────────────────────────── */
 
 function SyncInfoButton({ isSynced, syncState, syncStatus }) {
+  const { t } = useTranslation();
   const [showPanel, setShowPanel] = useState(false);
   const [integrity, setIntegrity] = useState(null);
   const [loadingIntegrity, setLoadingIntegrity] = useState(false);
@@ -80,7 +82,7 @@ function SyncInfoButton({ isSynced, syncState, syncStatus }) {
       >
         {isSynced ? <Wifi size={14} /> : <WifiOff size={14} />}
         <span className="hidden sm:inline">
-          {isSynced ? 'Synced' : syncState === 'syncing' ? 'Syncing...' : syncState === 'error' ? 'Error' : 'Idle'}
+          {isSynced ? t('sync.synced') : syncState === 'syncing' ? t('dashboard.syncing') : syncState === 'error' ? t('dashboard.error') : t('dashboard.idle')}
         </span>
       </motion.button>
 
@@ -93,25 +95,25 @@ function SyncInfoButton({ isSynced, syncState, syncStatus }) {
             className="absolute right-0 top-full mt-2 z-50 w-80 rounded-xl border p-4 text-xs shadow-lg"
             style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: '0 10px 40px rgba(0,0,0,0.4)' }}
           >
-            <h4 className="font-bold text-sm mb-3" style={{ color: 'var(--color-text)' }}>Stato Sincronizzazione</h4>
+            <h4 className="font-bold text-sm mb-3" style={{ color: 'var(--color-text)' }}>{t('sync.title')}</h4>
 
             {/* Sync info */}
             <div className="space-y-1.5 mb-3">
               <div className="flex justify-between">
-                <span style={{ color: 'var(--color-text-muted)' }}>Status</span>
+                <span style={{ color: 'var(--color-text-muted)' }}>{t('sync.status')}</span>
                 <span style={{ color: isSynced ? 'var(--color-success)' : 'var(--color-warning)' }}>
-                  {isSynced ? 'Sincronizzato' : syncState}
+                  {isSynced ? t('sync.synced') : syncState}
                 </span>
               </div>
               {syncStatus?.sync?.lastSync && (
                 <div className="flex justify-between">
-                  <span style={{ color: 'var(--color-text-muted)' }}>Ultima sync</span>
+                  <span style={{ color: 'var(--color-text-muted)' }}>{t('sync.lastSync')}</span>
                   <span style={{ color: 'var(--color-text)' }}>{new Date(syncStatus.sync.lastSync).toLocaleString()}</span>
                 </div>
               )}
               {syncStatus?.sync?.stats && (
                 <div className="flex justify-between">
-                  <span style={{ color: 'var(--color-text-muted)' }}>Sync stats</span>
+                  <span style={{ color: 'var(--color-text-muted)' }}>{t('sync.syncStats')}</span>
                   <span style={{ color: 'var(--color-text)' }}>
                     U:{syncStatus.sync.stats.users} C:{syncStatus.sync.stats.categories} T:{syncStatus.sync.stats.threads} P:{syncStatus.sync.stats.posts} V:{syncStatus.sync.stats.votes}
                   </span>
@@ -123,15 +125,15 @@ function SyncInfoButton({ isSynced, syncState, syncStatus }) {
             {syncStatus?.wallet && (
               <div className="space-y-1.5 mb-3 pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
                 <div className="flex justify-between">
-                  <span style={{ color: 'var(--color-text-muted)' }}>Wallet</span>
+                  <span style={{ color: 'var(--color-text-muted)' }}>{t('sync.wallet')}</span>
                   <span className="font-mono" style={{ color: 'var(--color-text)' }}>{syncStatus.wallet.address?.slice(0, 16)}...</span>
                 </div>
                 <div className="flex justify-between">
-                  <span style={{ color: 'var(--color-text-muted)' }}>Balance</span>
+                  <span style={{ color: 'var(--color-text-muted)' }}>{t('sync.balance')}</span>
                   <span className="font-mono" style={{ color: 'var(--color-primary)' }}>{syncStatus.wallet.balance}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span style={{ color: 'var(--color-text-muted)' }}>Network</span>
+                  <span style={{ color: 'var(--color-text-muted)' }}>{t('sync.network')}</span>
                   <span style={{ color: 'var(--color-text)' }}>{syncStatus.wallet.network}</span>
                 </div>
               </div>
@@ -139,26 +141,26 @@ function SyncInfoButton({ isSynced, syncState, syncStatus }) {
 
             {/* Integrity check */}
             <div className="pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
-              <h5 className="font-bold mb-2" style={{ color: 'var(--color-text)' }}>Integrity Check (DB vs Blockchain)</h5>
-              {loadingIntegrity && <span style={{ color: 'var(--color-text-muted)' }}>Verificando...</span>}
+              <h5 className="font-bold mb-2" style={{ color: 'var(--color-text)' }}>{t('sync.integrityCheck')}</h5>
+              {loadingIntegrity && <span style={{ color: 'var(--color-text-muted)' }}>{t('sync.verifying')}</span>}
               {integrity && !loadingIntegrity && (
                 <div className="space-y-1">
                   <div className="flex justify-between">
-                    <span style={{ color: 'var(--color-text-muted)' }}>Stato</span>
+                    <span style={{ color: 'var(--color-text-muted)' }}>{t('sync.state')}</span>
                     <span style={{ color: integrity.synced ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                      {integrity.synced ? 'IN SYNC' : 'MISMATCH'}
+                      {integrity.synced ? t('sync.inSync') : t('sync.mismatch')}
                     </span>
                   </div>
                   {integrity.local && (
                     <>
                       <div className="flex justify-between">
-                        <span style={{ color: 'var(--color-text-muted)' }}>DB locale</span>
+                        <span style={{ color: 'var(--color-text-muted)' }}>{t('sync.localDb')}</span>
                         <span style={{ color: 'var(--color-text)' }}>
                           U:{integrity.local.users} C:{integrity.local.categories} T:{integrity.local.threads} P:{integrity.local.posts} V:{integrity.local.votes}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span style={{ color: 'var(--color-text-muted)' }}>Blockchain</span>
+                        <span style={{ color: 'var(--color-text-muted)' }}>{t('sync.blockchain')}</span>
                         <span style={{ color: 'var(--color-text)' }}>
                           U:{integrity.chain.users} C:{integrity.chain.categories} T:{integrity.chain.threads} P:{integrity.chain.posts} V:{integrity.chain.votes}
                         </span>
@@ -175,7 +177,7 @@ function SyncInfoButton({ isSynced, syncState, syncStatus }) {
                     className="mt-1 text-[10px] underline"
                     style={{ color: 'var(--color-primary)' }}
                   >
-                    Ricontrolla
+                    {t('sync.recheck')}
                   </button>
                 </div>
               )}
@@ -188,6 +190,7 @@ function SyncInfoButton({ isSynced, syncState, syncStatus }) {
 }
 
 export default function Layout() {
+  const { t } = useTranslation();
   const { forumName } = useTheme();
   const { identity } = useIdentity();
   const navigate = useNavigate();
@@ -280,33 +283,30 @@ export default function Layout() {
               <>
                 <Loader2 size={48} className="animate-spin mx-auto mb-4" style={{ color: 'var(--color-primary)' }} />
                 <h2 className="text-xl font-bold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
-                  Ricarica in corso...
+                  {t('layout.refueling')}
                 </h2>
                 <p className="mb-4" style={{ color: 'var(--color-text-muted)' }}>
-                  Il bilancio del wallet e insufficiente ({iotaBalance} IOTA).
-                  Richiesta fondi dal faucet {walletNetwork} in corso.
-                  Il forum sara disponibile appena i fondi arriveranno.
+                  {t('layout.refuelingDesc')}
                 </p>
                 <div className="flex items-center justify-center gap-2 text-sm" style={{ color: 'var(--color-warning)' }}>
                   <Fuel size={16} />
-                  Faucet richiesto automaticamente
+                  {t('layout.faucetRequested')}
                 </div>
               </>
             ) : (
               <>
                 <AlertTriangle size={48} className="mx-auto mb-4" style={{ color: 'var(--color-danger)' }} />
                 <h2 className="text-xl font-bold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
-                  Bilancio insufficiente
+                  {t('layout.lowBalanceTitle')}
                 </h2>
                 <p className="mb-4" style={{ color: 'var(--color-text-muted)' }}>
-                  Il wallet del forum ha {iotaBalance} IOTA sulla rete {walletNetwork}.
-                  Per pubblicare transazioni e necessario ricaricare il wallet.
+                  {t('layout.lowBalanceDesc', { balance: iotaBalance, network: walletNetwork })}
                 </p>
                 <p className="text-sm font-mono p-3 rounded-lg mb-4" style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-primary)' }}>
-                  {syncStatus?.wallet?.address || 'Indirizzo non disponibile'}
+                  {syncStatus?.wallet?.address || t('layout.addressNotAvailable')}
                 </p>
                 <p className="text-sm" style={{ color: 'var(--color-danger)' }}>
-                  Invia almeno 1 IOTA a questo indirizzo per ripristinare il funzionamento.
+                  {t('layout.sendAtLeast')}
                 </p>
               </>
             )}
@@ -319,7 +319,7 @@ export default function Layout() {
           <Sidebar
             collapsed={collapsed}
             onToggle={() => setCollapsed((c) => !c)}
-            navItems={getNavItems(isAdmin)}
+            navItems={getNavItems(isAdmin, t)}
           />
         </div>
 
@@ -334,7 +334,7 @@ export default function Layout() {
               <Sidebar
                 collapsed={false}
                 onToggle={() => setMobileOpen(false)}
-                navItems={getNavItems(isAdmin)}
+                navItems={getNavItems(isAdmin, t)}
               />
             </div>
           </div>
@@ -377,7 +377,7 @@ export default function Layout() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search..."
+                  placeholder={t('nav.search')}
                   className="w-full pl-9 pr-4 py-2 rounded-xl border bg-transparent outline-none text-sm transition-colors"
                   style={{
                     borderColor: 'var(--color-border)',

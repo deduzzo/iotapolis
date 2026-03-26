@@ -6,6 +6,7 @@ import MarkdownRender from './MarkdownRender';
 import RichEditor from './RichEditor';
 import VoteButtons from './VoteButtons';
 import BlockchainInfo from './BlockchainInfo';
+import { useTranslation } from 'react-i18next';
 
 function formatDate(dateStr) {
   if (!dateStr) return '--';
@@ -41,6 +42,7 @@ export default function PostCard({
   isFresh,
   layout = 'cards',
 }) {
+  const { t } = useTranslation();
   const [replyContent, setReplyContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const isReplying = replyToId === post.id;
@@ -84,17 +86,17 @@ export default function PostCard({
   /* ── Edit / Reply shared UI ── */
   const editForm = editing && (
     <div className="mb-3">
-      <RichEditor value={editContent} onChange={setEditContent} placeholder="Modifica il post..." minHeight="100px" />
+      <RichEditor value={editContent} onChange={setEditContent} placeholder={t('post.editPost')} minHeight="100px" />
       <div className="flex items-center gap-2 mt-2 justify-end">
         <button onClick={() => setEditing(false)}
           className="px-3 py-1.5 rounded-lg text-xs border transition-colors hover:bg-white/5"
           style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>
-          <X size={12} className="inline mr-1" />Annulla
+          <X size={12} className="inline mr-1" />{t('post.cancel')}
         </button>
         <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
           onClick={handleSaveEdit} disabled={editSubmitting || !editContent.trim()}
           className="btn-primary px-4 py-1.5 rounded-lg text-xs disabled:opacity-40">
-          <Save size={12} className="inline mr-1" />{editSubmitting ? 'Salvataggio...' : 'Salva'}
+          <Save size={12} className="inline mr-1" />{editSubmitting ? t('post.saving') : t('post.save')}
         </motion.button>
       </div>
     </div>
@@ -103,15 +105,15 @@ export default function PostCard({
   const replyForm = isReplying && (
     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
       className="mt-3 pt-3 border-t" style={{ borderColor: 'var(--color-border)' }}>
-      <RichEditor value={replyContent} onChange={setReplyContent} placeholder="Scrivi la tua risposta..." minHeight="80px" />
+      <RichEditor value={replyContent} onChange={setReplyContent} placeholder={t('post.writeReply')} minHeight="80px" />
       <div className="flex items-center gap-2 mt-2 justify-end">
         <button onClick={onCancelReply}
           className="px-3 py-1.5 rounded-lg text-xs border transition-colors hover:bg-white/5"
-          style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>Cancel</button>
+          style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>{t('post.cancel')}</button>
         <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
           onClick={handleSubmitInlineReply} disabled={submitting || !replyContent.trim()}
           className="btn-primary px-4 py-1.5 rounded-lg text-xs disabled:opacity-40">
-          {submitting ? 'Posting...' : 'Reply'}
+          {submitting ? t('post.posting') : t('post.reply')}
         </motion.button>
       </div>
     </motion.div>
@@ -123,20 +125,20 @@ export default function PostCard({
         <button onClick={() => onReply(post.id)}
           className="flex items-center gap-1 text-xs hover:underline transition-colors"
           style={{ color: 'var(--color-primary)' }}>
-          <MessageSquare size={12} />Reply
+          <MessageSquare size={12} />{t('post.reply')}
         </button>
       )}
       {isAuthor && !editing && (
         <button onClick={startEdit}
           className="flex items-center gap-1 text-xs hover:underline transition-colors"
           style={{ color: 'var(--color-text-muted)' }}>
-          <Edit3 size={12} />Edit
+          <Edit3 size={12} />{t('post.edit')}
         </button>
       )}
       <button onClick={() => onShowHistory?.(post.id)}
         className="flex items-center gap-1 text-xs hover:underline transition-colors"
         style={{ color: 'var(--color-text-muted)' }}>
-        <History size={12} />Storico{post.version > 1 && ` (v${post.version})`}
+        <History size={12} />{t('post.history')}{post.version > 1 && ` (v${post.version})`}
       </button>
       <BlockchainInfo entityType="post" entityId={post.id} />
     </div>
@@ -199,7 +201,7 @@ export default function PostCard({
             )}
             {/* Stats */}
             <div className="mt-2 text-[11px] space-y-0.5" style={{ color: 'var(--color-text-muted)' }}>
-              <div>Iscritto: {post.authorJoined ? new Date(post.authorJoined).toLocaleDateString() : '--'}</div>
+              <div>{t('post.registered')} {post.authorJoined ? new Date(post.authorJoined).toLocaleDateString() : '--'}</div>
             </div>
           </div>
 
