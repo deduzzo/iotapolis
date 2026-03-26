@@ -11,7 +11,8 @@
     "dev:frontend": "cd frontend && npm run dev",
     "build": "cd frontend && npm run build",
     "move:install-cli": "which iota > /dev/null 2>&1 || (echo 'Installing IOTA CLI via Homebrew...' && brew install iotaledger/tap/iota)",
-    "move:build": "npm run move:install-cli && cd move/forum && iota move build",
+    "move:fetch-framework": "test -d .tmp/iota-framework/crates/iota-framework/packages/iota-framework/sources || (echo 'Downloading IOTA Move framework...' && mkdir -p .tmp && cd .tmp && rm -rf iota-framework && git clone --depth 1 --branch mainnet --filter=blob:none --sparse https://github.com/iotaledger/iota.git iota-framework && cd iota-framework && git sparse-checkout set crates/iota-framework/packages/iota-framework crates/iota-framework/packages/move-stdlib && echo 'Framework downloaded.')",
+    "move:build": "npm run move:install-cli && npm run move:fetch-framework && cd move/forum && iota move build",
     "move:deploy": "npm run move:build && node api/utility/move-publish.js",
     "lint": "eslint ."
   },

@@ -1,11 +1,9 @@
+#[allow(duplicate_alias, lint(custom_state_change))]
 module forum::forum {
-    use iota::object::{Self, UID, ID};
-    use iota::transfer;
-    use iota::tx_context::{Self, TxContext};
     use iota::event;
-    use iota::clock::{Self, Clock};
+    use iota::clock::Clock;
     use iota::table::{Self, Table};
-    use std::string::{Self, String};
+    use std::string;
 
     // ── Errors ──────────────────────────────────────────────────────────
     const E_FORUM_MISMATCH: u64 = 0;
@@ -38,8 +36,8 @@ module forum::forum {
     /// Single event struct for all forum data.
     /// The `data` field carries gzipped JSON bytes.
     public struct ForumEvent has copy, drop {
-        tag: String,
-        entity_id: String,
+        tag: string::String,
+        entity_id: string::String,
         data: vector<u8>,
         version: u64,
         author: address,
@@ -49,7 +47,7 @@ module forum::forum {
     // ── Init (runs once on deploy) ──────────────────────────────────────
 
     fun init(ctx: &mut TxContext) {
-        let sender = tx_context::sender(ctx);
+        let sender = ctx.sender();
 
         let mut forum = Forum {
             id: object::new(ctx),
@@ -83,10 +81,9 @@ module forum::forum {
         clock: &Clock,
         ctx: &mut TxContext,
     ) {
-        let sender = tx_context::sender(ctx);
+        let sender = ctx.sender();
         assert!(!table::contains(&forum.users, sender), E_ALREADY_REGISTERED);
 
-        // Add to registry
         table::add(&mut forum.users, sender, true);
         forum.user_count = forum.user_count + 1;
         forum.event_count = forum.event_count + 1;
@@ -97,7 +94,7 @@ module forum::forum {
             data,
             version: 1,
             author: sender,
-            timestamp: clock::timestamp_ms(clock),
+            timestamp: clock.timestamp_ms(),
         });
     }
 
@@ -112,7 +109,7 @@ module forum::forum {
         clock: &Clock,
         ctx: &mut TxContext,
     ) {
-        let sender = tx_context::sender(ctx);
+        let sender = ctx.sender();
         assert!(table::contains(&forum.users, sender), E_NOT_REGISTERED);
 
         forum.event_count = forum.event_count + 1;
@@ -123,7 +120,7 @@ module forum::forum {
             data,
             version,
             author: sender,
-            timestamp: clock::timestamp_ms(clock),
+            timestamp: clock.timestamp_ms(),
         });
     }
 
@@ -148,8 +145,8 @@ module forum::forum {
             entity_id: string::utf8(entity_id),
             data,
             version,
-            author: tx_context::sender(ctx),
-            timestamp: clock::timestamp_ms(clock),
+            author: ctx.sender(),
+            timestamp: clock.timestamp_ms(),
         });
     }
 
