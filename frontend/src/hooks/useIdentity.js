@@ -180,7 +180,7 @@ async function signAndSendInternal(identity, url, method, data = {}) {
     ...data,
     authorId: identity.userId,
     nonce: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
+    createdAt: Date.now(),
   };
 
   const signature = await signPayload(identity.privateKey, payload);

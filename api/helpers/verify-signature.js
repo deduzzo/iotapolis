@@ -15,9 +15,11 @@ module.exports = {
       throw new Error('Missing signature or publicKey');
     }
 
-    // Remove signature for verification
+    // Remove signature and publicKey for verification
+    // (frontend signs payload WITHOUT these fields, then adds them to the body)
     const payload = { ...body };
     delete payload.signature;
+    delete payload.publicKey;
 
     // Canonical serialization (sorted keys)
     const canonical = JSON.stringify(payload, Object.keys(payload).sort());

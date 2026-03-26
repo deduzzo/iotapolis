@@ -75,6 +75,14 @@ module.exports = {
       });
       console.log('[register] Blockchain publish result:', JSON.stringify(txResult));
 
+      // First user becomes admin automatically
+      const allUsers = Users.findAll({});
+      const isFirstUser = !allUsers || allUsers.length === 0;
+      const role = isFirstUser ? 'admin' : 'user';
+      if (isFirstUser) {
+        console.log('[register] First user — assigning admin role to', username);
+      }
+
       // Cache in local db
       const user = Users.create({
         id: userId,
@@ -82,7 +90,7 @@ module.exports = {
         bio: inputs.bio || null,
         avatar: inputs.avatar || null,
         publicKey: inputs.publicKey,
-        role: 'user',
+        role,
         createdAt: inputs.createdAt,
       });
       console.log('[register] User cached in local db:', userId);
