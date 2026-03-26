@@ -76,6 +76,18 @@ const TAG_HANDLERS = {
   [FORUM_CONFIG]: 'handleForumConfig',
 };
 
+// --- Tag-to-entity mapping (per websocket broadcast) ---
+const TAG_ENTITY = {
+  [FORUM_USER]: 'user',
+  [FORUM_CATEGORY]: 'category',
+  [FORUM_THREAD]: 'thread',
+  [FORUM_POST]: 'post',
+  [FORUM_VOTE]: 'post',
+  [FORUM_ROLE]: 'user',
+  [FORUM_MODERATION]: 'post',
+  [FORUM_CONFIG]: 'config',
+};
+
 // --- Models (lazy-initialized) ---
 let User, Category, Thread, Post, Vote, Role, Moderation, Config;
 
@@ -260,14 +272,20 @@ class ForumManager {
       sails.log.warn('[ForumManager] Local cache update failed after publish:', err.message);
     }
 
-    // Broadcast real-time event
+    // Broadcast real-time event (dataChanged per il frontend)
     try {
-      await sails.helpers.broadcastEvent(tag, {
-        action: 'upsert',
+      const entity = TAG_ENTITY[tag] || tag;
+      await sails.helpers.broadcastEvent('dataChanged', {
+        entity,
+        action: `${entity}Updated`,
+        label: entityId,
         entityId,
         tag,
         digest: result.digest,
-        verified: true,
+        // Includi info utili per aggiornamenti granulari
+        ...(data.threadId && { threadId: data.threadId }),
+        ...(data.categoryId && { categoryId: data.categoryId }),
+        ...(data.postId && { postId: data.postId }),
       });
     } catch (err) {
       sails.log.warn('[ForumManager] Broadcast failed:', err.message);
