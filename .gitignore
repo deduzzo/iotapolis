@@ -9,3 +9,9 @@ config/private_arweave_conf.js
 .idea/
 move/forum/build/
 move/forum/Move.lock
+
+# Electron build output
+desktop/dist/
+desktop/node_modules/
+desktop/dist/
+desktop/node_modules/

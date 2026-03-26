@@ -39,7 +39,7 @@
     "mac": {
       "category": "public.app-category.social-networking",
       "target": [
-        { "target": "dmg", "arch": ["universal"] }
+        { "target": "dmg", "arch": ["x64", "arm64"] }
       ],
       "icon": "icons/icon.icns"
     },
