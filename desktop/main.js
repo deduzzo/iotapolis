@@ -51,10 +51,18 @@ autoUpdater.on('checking-for-update', () => {
 
 autoUpdater.on('update-available', (info) => {
   console.log('[updater] Update available:', info.version);
-  sendUpdateEvent('available', {
-    version: info.version,
-    releaseNotes: info.releaseNotes,
-    releaseDate: info.releaseDate,
+  sendUpdateEvent('available', { version: info.version });
+  // Native dialog — reliable fallback
+  dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: 'Aggiornamento disponibile',
+    message: `Nuova versione ${info.version} disponibile. Scaricare ora?`,
+    buttons: ['Scarica', 'Più tardi'],
+    defaultId: 0,
+  }).then((result) => {
+    if (result.response === 0) {
+      autoUpdater.downloadUpdate();
+    }
   });
 });
 
@@ -64,17 +72,30 @@ autoUpdater.on('update-not-available', () => {
 });
 
 autoUpdater.on('download-progress', (progress) => {
-  sendUpdateEvent('progress', {
-    percent: Math.round(progress.percent),
-    transferred: progress.transferred,
-    total: progress.total,
-    speed: progress.bytesPerSecond,
-  });
+  const pct = Math.round(progress.percent);
+  logToRenderer(`Download: ${pct}%`);
+  // Update title bar with progress
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setTitle(`IOTA Free Forum — Downloading update ${pct}%`);
+  }
 });
 
 autoUpdater.on('update-downloaded', (info) => {
   console.log('[updater] Update downloaded:', info.version);
-  sendUpdateEvent('downloaded', { version: info.version });
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setTitle('IOTA Free Forum');
+  }
+  dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: 'Aggiornamento pronto',
+    message: `Versione ${info.version} scaricata. Riavviare ora per installare?`,
+    buttons: ['Riavvia ora', 'Più tardi'],
+    defaultId: 0,
+  }).then((result) => {
+    if (result.response === 0) {
+      autoUpdater.quitAndInstall();
+    }
+  });
 });
 
 autoUpdater.on('error', (err) => {
