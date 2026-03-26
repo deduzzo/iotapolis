@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Folder, MessageSquare, FileText, Clock } from 'lucide-react';
+import { Folder, MessageSquare, FileText, Clock, Plus } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
+import { useIdentity } from '../hooks/useIdentity';
 import { api } from '../api/endpoints';
 import LoadingSpinner from '../components/LoadingSpinner';
 
@@ -30,11 +31,17 @@ function formatTime(dateStr) {
 }
 
 export default function Home() {
+  const { identity } = useIdentity();
   const { data: categories, loading, error } = useApi(
     () => api.getCategories(),
     [],
     ['category'],
   );
+  const { data: userProfile } = useApi(
+    () => identity?.userId ? api.getUser(identity.userId) : Promise.resolve(null),
+    [identity?.userId],
+  );
+  const isAdmin = userProfile?.user?.role === 'admin';
 
   if (loading) {
     return <LoadingSpinner size={32} className="min-h-[40vh]" />;
@@ -55,11 +62,26 @@ export default function Home() {
       <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4">
         <Folder size={48} style={{ color: 'var(--color-text-muted)' }} />
         <p className="text-lg" style={{ color: 'var(--color-text-muted)' }}>
-          No categories yet
+          Nessuna categoria
         </p>
-        <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-          An admin needs to create the first category.
-        </p>
+        {isAdmin ? (
+          <Link
+            to="/admin"
+            className="flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all"
+            style={{
+              backgroundColor: 'var(--color-primary)',
+              color: 'var(--color-background)',
+              borderRadius: 'var(--border-radius)',
+            }}
+          >
+            <Plus size={18} />
+            Crea la prima categoria
+          </Link>
+        ) : (
+          <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+            Un amministratore deve creare la prima categoria.
+          </p>
+        )}
       </div>
     );
   }
