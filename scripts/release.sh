@@ -147,11 +147,11 @@ cd "$ROOT_DIR"
 # ── 7. Create GitHub Release ────────────────────────────────────────
 echo -e "\n${YELLOW}[7/7] Creating GitHub Release...${NC}"
 
-# Collect release artifacts
-ARTIFACTS=""
-for f in desktop/dist/*.dmg desktop/dist/*.exe desktop/dist/*.AppImage desktop/dist/*.snap desktop/dist/*.deb desktop/dist/latest*.yml; do
+# Collect release artifacts (only current version)
+ARTIFACTS=()
+for f in desktop/dist/*"${NEW_VERSION}"*.dmg desktop/dist/*"${NEW_VERSION}"*.exe desktop/dist/*"${NEW_VERSION}"*.AppImage desktop/dist/*"${NEW_VERSION}"*.snap desktop/dist/*"${NEW_VERSION}"*.deb desktop/dist/latest*.yml; do
   if [ -f "$f" ]; then
-    ARTIFACTS="$ARTIFACTS $f"
+    ARTIFACTS+=("$f")
   fi
 done
 
@@ -164,9 +164,9 @@ else
 fi
 
 # Create release
-if [ -n "$ARTIFACTS" ]; then
-  echo -e "  Uploading artifacts:${ARTIFACTS}"
-  gh release create "v${NEW_VERSION}" $ARTIFACTS \
+if [ ${#ARTIFACTS[@]} -gt 0 ]; then
+  echo -e "  Uploading ${#ARTIFACTS[@]} artifacts..."
+  gh release create "v${NEW_VERSION}" "${ARTIFACTS[@]}" \
     --title "IOTA Free Forum v${NEW_VERSION}" \
     --notes "## What's Changed
 
