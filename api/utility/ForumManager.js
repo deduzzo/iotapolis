@@ -99,7 +99,12 @@ class ForumManager {
 
   constructor(socketId = null) {
     this._socketId = socketId;
+    this._syncState = { status: 'idle', lastSync: null, stats: null };
     if (socketId) iota.setSocketId(socketId);
+  }
+
+  getSyncState() {
+    return { ...this._syncState };
   }
 
   // -----------------------------------------------------------------------
@@ -111,6 +116,7 @@ class ForumManager {
    * decode each payload, route to handler, update SQLite cache.
    */
   async syncFromBlockchain(onProgress = null) {
+    this._syncState = { status: 'syncing', lastSync: null, stats: null };
     const syncLog = new SyncLogger();
     const logFile = syncLog.start();
     sails.log.info(`[ForumManager] Starting blockchain sync... (log: ${logFile || 'N/A'})`);
@@ -183,12 +189,14 @@ class ForumManager {
       reportProgress('done', totalTxs, totalTxs);
       syncLog.log(`Sync complete: ${JSON.stringify(stats)}`);
       syncLog.end(true);
+      this._syncState = { status: 'idle', lastSync: new Date().toISOString(), stats };
       sails.log.info(`[ForumManager] Sync complete:`, stats);
       return stats;
 
     } catch (err) {
       syncLog.log(`FATAL: ${err.message}\n${err.stack}`);
       syncLog.end(false);
+      this._syncState = { status: 'error', lastSync: null, error: err.message };
       sails.log.error('[ForumManager] Sync failed:', err);
       iota.clearBulkCache();
       throw err;

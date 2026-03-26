@@ -9,6 +9,7 @@ import Identity from './pages/Identity';
 import Admin from './pages/Admin';
 import ThemeAdmin from './pages/ThemeAdmin';
 import Dashboard from './pages/Dashboard';
+import Settings from './pages/Settings';
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/admin" element={<Admin />} />
         <Route path="/admin/theme" element={<ThemeAdmin />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
     </Routes>
   );

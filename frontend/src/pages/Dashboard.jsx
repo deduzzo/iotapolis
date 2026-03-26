@@ -94,22 +94,30 @@ export default function Dashboard() {
           Blockchain Sync Status
         </h2>
 
-        {syncStatus ? (
+        {syncStatus ? (() => {
+          const sync = syncStatus.sync || {};
+          const wallet = syncStatus.wallet || {};
+          const isSynced = sync.status === 'idle' && sync.lastSync;
+          const isSyncing = sync.status === 'syncing';
+          const isError = sync.status === 'error';
+          return (
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <div
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium"
                 style={{
-                  backgroundColor: syncStatus.synced
+                  backgroundColor: isSynced
                     ? 'rgba(0,255,136,0.1)'
+                    : isError ? 'rgba(255,68,68,0.1)'
                     : 'rgba(255,170,0,0.1)',
-                  color: syncStatus.synced
+                  color: isSynced
                     ? 'var(--color-success)'
+                    : isError ? 'var(--color-danger)'
                     : 'var(--color-warning)',
                 }}
               >
-                {syncStatus.synced ? <Wifi size={16} /> : <WifiOff size={16} />}
-                {syncStatus.synced ? 'Fully Synced' : 'Syncing...'}
+                {isSynced ? <Wifi size={16} /> : <WifiOff size={16} />}
+                {isSynced ? 'Synced' : isSyncing ? 'Syncing...' : isError ? 'Error' : 'Idle'}
               </div>
             </div>
 
@@ -119,34 +127,35 @@ export default function Dashboard() {
             >
               <div>
                 <p className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                  Current Milestone
+                  Wallet
                 </p>
-                <p className="text-sm font-mono font-bold">
-                  {syncStatus.currentMilestone ?? '--'}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                  Latest Milestone
-                </p>
-                <p className="text-sm font-mono font-bold">
-                  {syncStatus.latestMilestone ?? '--'}
+                <p className="text-sm font-mono font-bold" title={wallet.address || ''}>
+                  {wallet.address ? wallet.address.substring(0, 12) + '...' : '--'}
                 </p>
               </div>
               <div>
                 <p className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                  Last Updated
+                  Network
+                </p>
+                <p className="text-sm font-mono font-bold">
+                  {wallet.network || '--'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                  Last Sync
                 </p>
                 <p className="text-sm flex items-center gap-1">
                   <Clock size={12} style={{ color: 'var(--color-text-muted)' }} />
-                  {syncStatus.updatedAt
-                    ? new Date(syncStatus.updatedAt).toLocaleTimeString()
+                  {sync.lastSync
+                    ? new Date(sync.lastSync).toLocaleTimeString()
                     : '--'}
                 </p>
               </div>
             </div>
           </div>
-        ) : (
+          );
+        })() : (
           <div className="flex items-center justify-center py-6">
             <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
               Unable to fetch sync status
