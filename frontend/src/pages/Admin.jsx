@@ -111,17 +111,23 @@ function CategoriesTab() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!name.trim() || !identity) return;
+    console.log('[Admin] handleSubmit called. name:', name, 'identity:', !!identity, 'signAndSend:', typeof signAndSend);
+    if (!name.trim()) { addToast('Nome categoria richiesto', 'error'); return; }
+    if (!identity) { addToast('Identita non trovata — vai su /identity', 'error'); return; }
+    if (!signAndSend) { addToast('signAndSend non disponibile', 'error'); return; }
+
     setSubmitting(true);
     try {
       const url = editId
         ? `/api/v1/categories/${editId}`
         : '/api/v1/categories';
       const method = editId ? 'PUT' : 'POST';
+      console.log('[Admin] Sending to', method, url);
       const res = await signAndSend(url, method, {
         name: name.trim(),
         description: description.trim(),
       });
+      console.log('[Admin] Response status:', res.status);
       const resData = await res.json().catch(() => ({}));
       if (!res.ok) {
         console.error('[Admin] Category failed:', resData);
@@ -129,7 +135,7 @@ function CategoriesTab() {
         return;
       }
       console.log('[Admin] Category OK:', resData);
-      addToast(editId ? 'Categoria aggiornata' : 'Categoria creata', 'success');
+      addToast(editId ? 'Categoria aggiornata' : 'Categoria creata con TX on-chain!', 'success');
       setShowForm(false);
       setName('');
       setDescription('');
