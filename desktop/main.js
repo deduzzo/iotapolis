@@ -28,13 +28,19 @@ function logToRenderer(msg) {
 }
 
 function sendUpdateEvent(event, data = {}) {
-  logToRenderer(`update event: ${event} ${JSON.stringify(data)}`);
+  logToRenderer(`update event: ${event}`);
   if (mainWindow && !mainWindow.isDestroyed()) {
-    const payload = JSON.stringify({ event, ...data });
+    // Use base64 to avoid broken JS from HTML/quotes in releaseNotes
+    const cleanData = { event, ...data };
+    delete cleanData.releaseNotes; // Strip HTML release notes — not needed in UI
+    const b64 = Buffer.from(JSON.stringify(cleanData)).toString('base64');
     mainWindow.webContents.executeJavaScript(`
-      window.__latestUpdateEvent = ${payload};
-      window.dispatchEvent(new CustomEvent('electron-update', { detail: ${payload} }));
-    `).catch(() => {});
+      (function() {
+        var d = JSON.parse(atob('${b64}'));
+        window.__latestUpdateEvent = d;
+        window.dispatchEvent(new CustomEvent('electron-update', { detail: d }));
+      })();
+    `).catch((err) => console.log('[updater] sendEvent error:', err.message));
   }
 }
 
