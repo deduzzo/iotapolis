@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import {
   Users, FileText, MessageSquare, Activity,
-  Wifi, WifiOff, Database, Clock,
+  Wifi, WifiOff, Database, Clock, AlertTriangle,
 } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { api } from '../api/endpoints';
@@ -100,8 +100,30 @@ export default function Dashboard() {
           const isSynced = sync.status === 'idle' && sync.lastSync;
           const isSyncing = sync.status === 'syncing';
           const isError = sync.status === 'error';
+          const isMainnet = wallet.network === 'mainnet';
+          const retryQueue = syncStatus.retryQueue || {};
           return (
           <div className="space-y-3">
+            {/* Mainnet low balance warning */}
+            {isMainnet && wallet.balance && wallet.balance.includes('[0 IOTA]') && (
+              <div
+                className="p-3 rounded-lg text-sm flex items-center gap-2"
+                style={{ backgroundColor: 'rgba(255,68,68,0.1)', color: 'var(--color-danger)', borderRadius: 'var(--border-radius)' }}
+              >
+                <AlertTriangle size={16} />
+                <span><strong>Attenzione:</strong> Bilancio wallet insufficiente su mainnet! Ricarica il wallet per poter pubblicare transazioni.</span>
+              </div>
+            )}
+            {/* Retry queue warning */}
+            {retryQueue.pending > 0 && (
+              <div
+                className="p-3 rounded-lg text-sm flex items-center gap-2"
+                style={{ backgroundColor: 'rgba(255,170,0,0.1)', color: 'var(--color-warning)', borderRadius: 'var(--border-radius)' }}
+              >
+                <WifiOff size={16} />
+                <span>{retryQueue.pending} transazioni in coda di retry. {retryQueue.failed > 0 ? `${retryQueue.failed} fallite definitivamente.` : ''}</span>
+              </div>
+            )}
             <div className="flex items-center gap-3">
               <div
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium"

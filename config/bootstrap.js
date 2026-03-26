@@ -75,6 +75,44 @@ module.exports.bootstrap = async function (done) {
     console.log('[bootstrap] Retry queue processor not started:', err.message);
   }
 
+  // 5. Auto-refill faucet on testnet/devnet when balance is low
+  try {
+    const iota = require('../api/utility/iota');
+    const config = require('./private_iota_conf');
+    const network = config.IOTA_NETWORK || 'testnet';
+
+    if (network === 'testnet' || network === 'devnet') {
+      // Check balance every 60 seconds, request faucet if low
+      const MIN_BALANCE_NANOS = BigInt(1000000000); // 1 IOTA
+      const checkAndRefill = async () => {
+        try {
+          const status = await iota.getStatusAndBalance();
+          const balanceStr = status.balance || '0';
+          // Extract nanos from "X.XXX nanos [Y IOTA]" format
+          const nanosMatch = balanceStr.match(/^([\d.]+)\s*nanos/);
+          const nanos = nanosMatch ? BigInt(nanosMatch[1].replace(/\./g, '')) : BigInt(0);
+
+          if (nanos < MIN_BALANCE_NANOS) {
+            console.log(`[faucet-monitor] Balance low: ${balanceStr}. Requesting faucet...`);
+            await iota.requestFaucet();
+            console.log('[faucet-monitor] Faucet funds requested');
+          }
+        } catch (e) {
+          // Silently ignore — faucet may be rate-limited
+        }
+      };
+      // Check on startup after 5s delay, then every 60s
+      setTimeout(checkAndRefill, 5000);
+      setInterval(checkAndRefill, 60000);
+      console.log('[bootstrap] Faucet auto-refill monitor started (testnet/devnet, every 60s)');
+    } else {
+      console.log(`[bootstrap] Network: ${network} — faucet auto-refill disabled (mainnet)`);
+      console.log('[bootstrap] WARNING: Ensure wallet has sufficient IOTA balance for transactions!');
+    }
+  } catch (err) {
+    console.log('[bootstrap] Faucet monitor not started:', err.message);
+  }
+
   console.log('[bootstrap] Bootstrap complete. Sails is lifting...');
   done();
 };
