@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Folder, MessageSquare, FileText, Clock, Plus, Share2, Copy, CheckCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Folder, MessageSquare, FileText, Clock, Plus, Share2, Copy, CheckCircle, X, ExternalLink, Globe, Shield } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { useIdentity } from '../hooks/useIdentity';
 import { api } from '../api/endpoints';
@@ -48,6 +48,7 @@ export default function Home() {
   // All hooks MUST be before any conditional return
   const [forumInfo, setForumInfo] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   useEffect(() => {
     fetch('/api/v1/forum-info').then(r => r.json()).then(d => setForumInfo(d)).catch(() => {});
   }, []);
@@ -122,19 +123,17 @@ export default function Home() {
             animate={{ opacity: 1, scale: 1 }}
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
-            onClick={copyConnectionString}
+            onClick={() => setShowShare(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
             style={{
-              backgroundColor: copied ? 'rgba(0,255,136,0.15)' : 'var(--color-surface)',
-              color: copied ? 'var(--color-success)' : 'var(--color-primary)',
-              border: '1px solid',
-              borderColor: copied ? 'var(--color-success)' : 'var(--color-border)',
+              backgroundColor: 'var(--color-surface)',
+              color: 'var(--color-primary)',
+              border: '1px solid var(--color-border)',
               borderRadius: 'var(--border-radius)',
             }}
-            title={`Condividi: ${forumInfo.connectionString}`}
           >
-            {copied ? <CheckCircle size={16} /> : <Share2 size={16} />}
-            <span className="hidden sm:inline">{copied ? 'Copiato!' : 'Condividi Forum'}</span>
+            <Share2 size={16} />
+            <span className="hidden sm:inline">Condividi Forum</span>
           </motion.button>
         )}
       </div>
@@ -200,6 +199,112 @@ export default function Home() {
           </motion.div>
         ))}
       </motion.div>
+
+      {/* Share Forum Modal */}
+      <AnimatePresence>
+        {showShare && forumInfo && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="absolute inset-0 bg-black/60" onClick={() => setShowShare(false)} />
+            <motion.div
+              className="glass-card relative p-6 rounded-xl max-w-lg mx-4 w-full"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              style={{ borderRadius: 'var(--border-radius)' }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
+                  <Share2 size={20} style={{ color: 'var(--color-primary)' }} />
+                  Condividi questo forum
+                </h3>
+                <button onClick={() => setShowShare(false)} className="p-1 rounded-lg hover:bg-white/10">
+                  <X size={18} style={{ color: 'var(--color-text-muted)' }} />
+                </button>
+              </div>
+
+              <p className="mb-4 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                Chiunque puo collegarsi a questo forum con le informazioni qui sotto. I dati sono pubblici sulla blockchain IOTA.
+              </p>
+
+              {/* Connection string */}
+              <div className="mb-4">
+                <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                  Stringa di connessione
+                </label>
+                <div className="flex items-center gap-2">
+                  <code
+                    className="flex-1 p-3 rounded-lg text-sm font-mono break-all"
+                    style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-success)' }}
+                  >
+                    {forumInfo.connectionString}
+                  </code>
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(forumInfo.connectionString); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                    className="p-2 rounded-lg transition-all shrink-0"
+                    style={{ backgroundColor: copied ? 'rgba(0,255,136,0.15)' : 'var(--color-surface)' }}
+                  >
+                    {copied ? <CheckCircle size={16} style={{ color: 'var(--color-success)' }} /> : <Copy size={16} style={{ color: 'var(--color-primary)' }} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Address */}
+              <div className="mb-4">
+                <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                  Indirizzo wallet IOTA
+                </label>
+                <code
+                  className="block p-3 rounded-lg text-xs font-mono break-all"
+                  style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-primary)' }}
+                >
+                  {forumInfo.address}
+                </code>
+              </div>
+
+              {/* Network + Explorer */}
+              <div className="flex items-center justify-between mb-5">
+                <span className="text-xs flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                  <Globe size={12} />
+                  Network: <strong style={{ color: 'var(--color-text)' }}>{forumInfo.network}</strong>
+                </span>
+                {forumInfo.explorerUrl && (
+                  <a
+                    href={`${forumInfo.explorerUrl}/address/${forumInfo.address}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs flex items-center gap-1"
+                    style={{ color: 'var(--color-primary)' }}
+                  >
+                    <ExternalLink size={12} />
+                    Vedi su Explorer
+                  </a>
+                )}
+              </div>
+
+              {/* Guide */}
+              <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--color-background)', borderRadius: 'var(--border-radius)' }}>
+                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                  <Shield size={14} style={{ color: 'var(--color-primary)' }} />
+                  Come collegarsi
+                </h4>
+                <ol className="text-xs space-y-1.5 list-decimal list-inside" style={{ color: 'var(--color-text-muted)' }}>
+                  <li>L'utente installa il progetto IOTA Free Forum sul proprio PC</li>
+                  <li>Avvia il server con <code style={{ color: 'var(--color-text)' }}>npm run dev</code></li>
+                  <li>Alla schermata di setup, sceglie <strong style={{ color: 'var(--color-text)' }}>"Collegati a un forum esistente"</strong></li>
+                  <li>Incolla la stringa di connessione: <code style={{ color: 'var(--color-success)' }}>{forumInfo.connectionString?.substring(0, 20)}...</code></li>
+                  <li>Il sistema scarica tutte le transazioni dalla blockchain</li>
+                  <li>Genera la propria identita (chiave RSA) e puo partecipare</li>
+                </ol>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
