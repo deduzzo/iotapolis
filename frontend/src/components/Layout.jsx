@@ -78,7 +78,7 @@ export default function Layout() {
     [identity?.userId],
     ['user'],
   );
-  const isAdmin = userProfile?.role === 'admin';
+  const isAdmin = userProfile?.user?.role === 'admin' || userProfile?.role === 'admin';
 
   /* Search */
   const [searchQuery, setSearchQuery] = useState('');

@@ -424,7 +424,9 @@ async function _publishSingleTx(marker, payloadBuf) {
   for (let i = 0; i < allCoins.length; i++) {
     tx.transferObjects([allCoins[i]], address);
   }
-  tx.setGasBudget(Math.max(10000000, chunks.length * 500000));
+  // Gas budget: scale with number of commands (splitCoins + transferObjects)
+  const totalCommands = allAmounts.length * 2; // split + transfer per coin
+  tx.setGasBudget(Math.max(50000000, totalCommands * 1000000));
 
   const result = await client.signAndExecuteTransaction({
     signer: keypair,
@@ -432,6 +434,14 @@ async function _publishSingleTx(marker, payloadBuf) {
     options: { showInput: true, showEffects: true },
   });
   await client.waitForTransaction({ digest: result.digest });
+
+  // Check if TX was successful on-chain
+  const txStatus = result.effects?.status?.status;
+  if (txStatus !== 'success') {
+    const errMsg = result.effects?.status?.error || `TX on-chain status: ${txStatus}`;
+    console.log(`[iota] _publishSingleTx FAILED on-chain: ${errMsg}`);
+    throw new Error(errMsg);
+  }
 
   const network = config.IOTA_NETWORK || 'testnet';
   const explorerUrl = `https://explorer.iota.org/txblock/${result.digest}${network !== 'mainnet' ? '?network=' + network : ''}`;

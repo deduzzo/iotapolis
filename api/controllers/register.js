@@ -83,13 +83,14 @@ module.exports = {
       });
       console.log('[register] Blockchain publish result:', JSON.stringify(txResult));
 
-      if (!txResult.success) {
-        console.log('[register] TX failed — registration aborted. Error:', txResult.error);
+      if (!txResult.success || txResult.verified === false) {
+        console.log('[register] TX failed or not verified — registration aborted. Error:', txResult.error || 'not verified on-chain');
         this.res.status(503);
         return {
           success: false,
-          error: 'Blockchain transaction failed: ' + (txResult.error || 'unknown'),
+          error: 'Blockchain transaction failed: ' + (txResult.error || 'TX not verified on-chain'),
           retryQueued: true,
+          digest: txResult.digest || null,
         };
       }
 
