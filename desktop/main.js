@@ -258,11 +258,20 @@ app.on('ready', async () => {
   setupUpdateIPC();
 
   // Check for updates at startup (non-blocking)
-  if (!isDev) {
-    setTimeout(() => {
-      autoUpdater.checkForUpdates().catch(() => {});
-    }, 3000);
-  }
+  setTimeout(() => {
+    console.log('[updater] Checking for updates... isDev:', isDev);
+    autoUpdater.checkForUpdates().then((result) => {
+      console.log('[updater] Check result:', result?.updateInfo?.version || 'no update');
+    }).catch((err) => {
+      console.log('[updater] Check failed:', err.message);
+      // Show error in renderer console too
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.executeJavaScript(
+          `console.error('[updater] Check failed: ${err.message.replace(/'/g, "\\'")}')`
+        );
+      }
+    });
+  }, 5000);
 });
 
 app.on('window-all-closed', () => {
