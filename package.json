@@ -10,6 +10,9 @@
     "dev": "concurrently \"node app.js\" \"npm run dev:frontend\"",
     "dev:frontend": "cd frontend && npm run dev",
     "build": "cd frontend && npm run build",
+    "move:install-cli": "which iota > /dev/null 2>&1 || (echo 'Installing IOTA CLI via Homebrew...' && brew install iotaledger/tap/iota)",
+    "move:build": "npm run move:install-cli && cd move/forum && iota move build",
+    "move:deploy": "npm run move:build && node api/utility/move-publish.js",
     "lint": "eslint ."
   },
   "dependencies": {

@@ -253,26 +253,49 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Address */}
-              <div className="mb-4">
-                <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--color-text-muted)' }}>
-                  Indirizzo wallet IOTA
-                </label>
-                <code
-                  className="block p-3 rounded-lg text-xs font-mono break-all"
-                  style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-primary)' }}
-                >
-                  {forumInfo.address}
-                </code>
-              </div>
+              {/* Move contract info or legacy address */}
+              {forumInfo.moveMode ? (
+                <div className="mb-4 space-y-2">
+                  <div>
+                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                      Package ID (Smart Contract)
+                    </label>
+                    <code className="block p-2 rounded-lg text-xs font-mono break-all"
+                      style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-primary)' }}>
+                      {forumInfo.packageId}
+                    </code>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                      Forum Object ID
+                    </label>
+                    <code className="block p-2 rounded-lg text-xs font-mono break-all"
+                      style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-primary)' }}>
+                      {forumInfo.forumObjectId}
+                    </code>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-4">
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                    Indirizzo wallet IOTA
+                  </label>
+                  <code className="block p-3 rounded-lg text-xs font-mono break-all"
+                    style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-primary)' }}>
+                    {forumInfo.address}
+                  </code>
+                </div>
+              )}
 
               {/* Network + Explorer */}
               <div className="flex items-center justify-between mb-5">
                 <span className="text-xs flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
                   <Globe size={12} />
                   Network: <strong style={{ color: 'var(--color-text)' }}>{forumInfo.network}</strong>
+                  {forumInfo.moveMode && <span className="ml-1 px-1.5 py-0.5 rounded text-[10px]"
+                    style={{ backgroundColor: 'rgba(0,240,255,0.15)', color: 'var(--color-primary)' }}>Move</span>}
                 </span>
-                {forumInfo.explorerUrl && (
+                {forumInfo.explorerUrl && forumInfo.address && (
                   <a
                     href={`${forumInfo.explorerUrl}/address/${forumInfo.address}`}
                     target="_blank"
@@ -296,9 +319,9 @@ export default function Home() {
                   <li>L'utente installa il progetto IOTA Free Forum sul proprio PC</li>
                   <li>Avvia il server con <code style={{ color: 'var(--color-text)' }}>npm run dev</code></li>
                   <li>Alla schermata di setup, sceglie <strong style={{ color: 'var(--color-text)' }}>"Collegati a un forum esistente"</strong></li>
-                  <li>Incolla la stringa di connessione: <code style={{ color: 'var(--color-success)' }}>{forumInfo.connectionString?.substring(0, 20)}...</code></li>
-                  <li>Il sistema scarica tutte le transazioni dalla blockchain</li>
-                  <li>Genera la propria identita (chiave RSA) e puo partecipare</li>
+                  <li>Incolla la stringa di connessione: <code style={{ color: 'var(--color-success)' }}>{forumInfo.connectionString?.substring(0, 40)}...</code></li>
+                  <li>Il sistema si collega allo smart contract e scarica tutti gli eventi</li>
+                  <li>Registra la propria identita e interagisce direttamente con la blockchain</li>
                 </ol>
               </div>
             </motion.div>
