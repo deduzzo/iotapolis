@@ -55,7 +55,7 @@ export default function Home() {
     );
   }
 
-  const list = Array.isArray(categories) ? categories : categories?.data || [];
+  const list = Array.isArray(categories) ? categories : categories?.categories || categories?.data || [];
 
   if (list.length === 0) {
     return (
