@@ -147,11 +147,17 @@ cd "$ROOT_DIR"
 # ── 7. Create GitHub Release ────────────────────────────────────────
 echo -e "\n${YELLOW}[7/7] Creating GitHub Release...${NC}"
 
-# Collect release artifacts (only current version)
+# Collect and rename release artifacts (spaces → hyphens to match latest-mac.yml)
 ARTIFACTS=()
-for f in desktop/dist/*"${NEW_VERSION}"*.dmg desktop/dist/*"${NEW_VERSION}"*.exe desktop/dist/*"${NEW_VERSION}"*.AppImage desktop/dist/*"${NEW_VERSION}"*.snap desktop/dist/*"${NEW_VERSION}"*.deb desktop/dist/latest*.yml; do
+for f in desktop/dist/*"${NEW_VERSION}"*.dmg desktop/dist/*"${NEW_VERSION}"*.exe desktop/dist/*"${NEW_VERSION}"*.AppImage desktop/dist/latest*.yml; do
   if [ -f "$f" ]; then
-    ARTIFACTS+=("$f")
+    # Rename spaces to hyphens so GitHub URL matches latest-mac.yml
+    newname=$(echo "$f" | sed 's/ /-/g')
+    if [ "$f" != "$newname" ]; then
+      mv "$f" "$newname"
+      echo -e "  Renamed: $(basename "$f") → $(basename "$newname")"
+    fi
+    ARTIFACTS+=("$newname")
   fi
 done
 

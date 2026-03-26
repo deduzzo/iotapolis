@@ -100,7 +100,8 @@ autoUpdater.on('update-downloaded', (info) => {
 
 autoUpdater.on('error', (err) => {
   console.log('[updater] Error:', err.message);
-  sendUpdateEvent('error', { message: err.message });
+  logToRenderer('UPDATE ERROR: ' + err.message);
+  dialog.showErrorBox('Errore aggiornamento', err.message || String(err));
 });
 
 // Listen for renderer commands via custom protocol
