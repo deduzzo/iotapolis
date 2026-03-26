@@ -19,8 +19,11 @@ export default function Modal({ open, onClose, title, children, wide = false }) 
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="fixed inset-0 flex items-center justify-center z-[70] p-4"
           >
-            <div className={`glass-static rounded-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-lg'} border border-white/10 max-h-[90vh] flex flex-col`}>
-              <div className="flex items-center justify-between p-5 border-b border-white/10 shrink-0">
+            <div
+              className={`rounded-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-lg'} border max-h-[90vh] flex flex-col`}
+              style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}
+            >
+              <div className="flex items-center justify-between p-5 border-b shrink-0" style={{ borderColor: 'var(--color-border)' }}>
                 <h3 className="text-lg font-semibold">{title}</h3>
                 <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
                   <X size={18} />

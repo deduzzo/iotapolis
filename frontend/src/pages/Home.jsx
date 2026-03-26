@@ -376,11 +376,16 @@ export default function Home() {
           >
             <div className="absolute inset-0 bg-black/60" onClick={() => setShowShare(false)} />
             <motion.div
-              className="glass-card relative p-6 rounded-xl max-w-lg mx-4 w-full"
+              className="relative p-6 rounded-xl max-w-lg mx-4 w-full border"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              style={{ borderRadius: 'var(--border-radius)' }}
+              style={{
+                borderRadius: 'var(--border-radius)',
+                background: 'var(--color-surface)',
+                borderColor: 'var(--color-border)',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+              }}
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>

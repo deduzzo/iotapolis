@@ -99,11 +99,16 @@ export default function BlockchainInfo({ entityType, entityId, trigger }) {
           >
             <div className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} />
             <motion.div
-              className="glass-card relative p-6 rounded-xl max-w-lg mx-4 w-full max-h-[80vh] overflow-y-auto"
+              className="relative p-6 rounded-xl max-w-lg mx-4 w-full max-h-[80vh] overflow-y-auto border"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              style={{ borderRadius: 'var(--border-radius)' }}
+              style={{
+                borderRadius: 'var(--border-radius)',
+                background: 'var(--color-surface)',
+                borderColor: 'var(--color-border)',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+              }}
             >
               {/* Header */}
               <div className="flex items-center justify-between mb-4">
