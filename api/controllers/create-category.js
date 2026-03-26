@@ -26,12 +26,16 @@ module.exports = {
   fn: async function (inputs) {
     try {
       const { userId } = await sails.helpers.verifySignature(this.req.body);
+      console.log('[create-category] Verified userId:', userId);
 
       // Check admin role
       const Users = db.getModel('users');
       const user = Users.findOne({ id: userId });
+      console.log('[create-category] User found:', user ? `${user.username} role=${user.role}` : 'NOT FOUND');
       if (!user || user.role !== 'admin') {
-        throw 'forbidden';
+        console.log('[create-category] FORBIDDEN — not admin');
+        this.res.status(403);
+        return { success: false, error: `Access denied. User ${userId} role: ${user?.role || 'not found'}` };
       }
 
       // Generate id from nonce
