@@ -117,14 +117,28 @@ module.exports = {
       // Reload config in iota.js
       iota._resetRuntime();
 
+      // Sync from blockchain — populate local cache with all forum data
+      let syncStats = null;
+      if (totalEvents > 0) {
+        try {
+          console.log('[sync-connect] Starting blockchain sync...');
+          const ForumManager = require('../utility/ForumManager');
+          syncStats = await ForumManager.syncFromBlockchain();
+          console.log('[sync-connect] Sync complete:', syncStats);
+        } catch (syncErr) {
+          console.warn('[sync-connect] Sync failed (will retry on next startup):', syncErr.message);
+        }
+      }
+
       return {
         success: true,
         packageId,
         forumObjectId,
         network,
         totalEvents,
+        syncStats,
         message: totalEvents > 0
-          ? `Connesso! Trovati ${totalEvents} eventi del forum.`
+          ? `Connesso e sincronizzato! Trovati ${totalEvents} eventi del forum.`
           : 'Connesso al contratto. Nessun evento ancora (forum nuovo).',
       };
     } catch (err) {
