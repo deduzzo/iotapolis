@@ -131,9 +131,22 @@ module.exports.bootstrap = async function (done) {
     console.log('[bootstrap] Step 3/3: Starting blockchain sync in background...');
     console.log('[bootstrap] ForumManager type:', typeof ForumManager, 'syncFromBlockchain:', typeof ForumManager.syncFromBlockchain);
     if (typeof ForumManager.syncFromBlockchain === 'function') {
-      ForumManager.syncFromBlockchain().then(() => {
+      ForumManager.syncFromBlockchain().then(async () => {
         console.log('[bootstrap] Blockchain sync completed successfully');
         log.info('[bootstrap] Blockchain sync completed');
+
+        // Initialize event cursor after full sync, then start polling
+        try {
+          await ForumManager.initEventCursor();
+          console.log('[bootstrap] Event cursor initialized — starting blockchain polling (30s)');
+          setInterval(() => {
+            ForumManager.pollNewEvents().catch(err => {
+              sails.log.warn('[poll] Error:', err.message);
+            });
+          }, 30000);
+        } catch (cursorErr) {
+          console.log('[bootstrap] Event cursor init failed:', cursorErr.message);
+        }
       }).catch((err) => {
         console.log('[bootstrap] Blockchain sync failed:', err.message);
         log.warn('[bootstrap] Blockchain sync failed:', err.message);

@@ -1218,6 +1218,72 @@ async function queryForumEvents(remotePackageId = null) {
 }
 
 /**
+ * Query forum events starting from a cursor (for incremental polling).
+ * Returns { events: [{tag, payload, ...}], nextCursor, lastCursor }
+ */
+async function queryForumEventsSince(startCursor = null) {
+  const config = _getConfig();
+  const client = await getClient();
+  const packageId = config.FORUM_PACKAGE_ID;
+
+  if (!packageId) {
+    throw new Error('FORUM_PACKAGE_ID not configured.');
+  }
+
+  const events = [];
+  let cursor = startCursor;
+  let hasMore = true;
+  let lastCursor = startCursor;
+
+  while (hasMore) {
+    const opts = {
+      query: { MoveModule: { package: packageId, module: 'forum' } },
+      limit: 50,
+      order: 'ascending',
+    };
+    if (cursor) opts.cursor = cursor;
+
+    const result = await client.queryEvents(opts);
+
+    for (const ev of result.data) {
+      try {
+        const parsed = ev.parsedJson;
+        if (!parsed || !parsed.tag) continue;
+
+        let payload;
+        try {
+          const dataBytes = Buffer.from(parsed.data);
+          const jsonStr = zlib.gunzipSync(dataBytes).toString('utf8');
+          payload = JSON.parse(jsonStr);
+        } catch (decErr) {
+          payload = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
+        }
+
+        events.push({
+          payload,
+          version: parsed.version ? Number(parsed.version) : 1,
+          timestamp: parsed.timestamp ? Number(parsed.timestamp) : null,
+          digest: ev.id?.txDigest,
+          tag: parsed.tag,
+          entityId: parsed.entity_id,
+          author: parsed.author,
+        });
+      } catch (err) {
+        sails.log.warn(`[iota] queryForumEventsSince: error decoding event:`, err.message);
+      }
+    }
+
+    hasMore = result.hasNextPage;
+    if (result.nextCursor) {
+      lastCursor = result.nextCursor;
+    }
+    cursor = result.nextCursor;
+  }
+
+  return { events, lastCursor };
+}
+
+/**
  * Query forum events for a specific entity (for history).
  */
 async function queryForumEventsByEntity(tag, entityId) {
@@ -1269,6 +1335,7 @@ module.exports = {
   isMoveModeEnabled,
   publishDataMove,
   queryForumEvents,
+  queryForumEventsSince,
   queryForumEventsByEntity,
   setUserRole,
 };

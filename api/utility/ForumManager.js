@@ -768,6 +768,90 @@ class ForumManager {
   }
 
   // -----------------------------------------------------------------------
+  // 6. pollNewEvents — Incremental blockchain polling
+  // -----------------------------------------------------------------------
+
+  /**
+   * Poll the blockchain for new events since the last known cursor.
+   * Processes new transactions, updates cache, and broadcasts dataChanged
+   * so all connected clients get real-time updates.
+   * Call this periodically (e.g. every 30 seconds).
+   */
+  async pollNewEvents() {
+    if (!iota.isMoveModeEnabled()) return; // Solo Move mode ha gli eventi
+
+    // Prima sync completa imposta il cursor
+    if (!this._lastEventCursor && this._syncState.status !== 'idle') return;
+
+    try {
+      const { events, lastCursor } = await iota.queryForumEventsSince(this._lastEventCursor);
+
+      if (events.length === 0) {
+        this._lastEventCursor = lastCursor;
+        return;
+      }
+
+      sails.log.info(`[ForumManager] Poll: ${events.length} new events from blockchain`);
+      ensureModels();
+
+      let changeCount = 0;
+      for (const event of events) {
+        try {
+          const data = typeof event.payload === 'string'
+            ? JSON.parse(event.payload)
+            : event.payload;
+
+          this.processTransaction(event.tag, data);
+          changeCount++;
+
+          // Broadcast dataChanged per ogni nuovo evento
+          const entity = TAG_ENTITY[event.tag] || event.tag;
+          try {
+            await sails.helpers.broadcastEvent('dataChanged', {
+              entity,
+              action: `${entity}Updated`,
+              label: event.entityId,
+              entityId: event.entityId,
+              tag: event.tag,
+              digest: event.digest,
+              ...(data.threadId && { threadId: data.threadId }),
+              ...(data.categoryId && { categoryId: data.categoryId }),
+              ...(data.postId && { postId: data.postId }),
+            });
+          } catch (bErr) {
+            // broadcast best-effort
+          }
+        } catch (err) {
+          sails.log.warn(`[ForumManager] Poll: error processing event:`, err.message);
+        }
+      }
+
+      this._lastEventCursor = lastCursor;
+
+      if (changeCount > 0) {
+        sails.log.info(`[ForumManager] Poll: processed ${changeCount} changes, cursor updated`);
+      }
+    } catch (err) {
+      sails.log.warn('[ForumManager] Poll failed:', err.message);
+    }
+  }
+
+  /**
+   * Initialize the event cursor by scanning all existing events.
+   * Called after the initial syncFromBlockchain completes.
+   */
+  async initEventCursor() {
+    if (!iota.isMoveModeEnabled()) return;
+    try {
+      const { lastCursor } = await iota.queryForumEventsSince(null);
+      this._lastEventCursor = lastCursor;
+      sails.log.info(`[ForumManager] Event cursor initialized`);
+    } catch (err) {
+      sails.log.warn('[ForumManager] Failed to init event cursor:', err.message);
+    }
+  }
+
+  // -----------------------------------------------------------------------
   // Internal helpers
   // -----------------------------------------------------------------------
 
