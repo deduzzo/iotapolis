@@ -38,18 +38,18 @@ export default function Sidebar({ collapsed, onToggle, navItems }) {
               exit={{ opacity: 0 }}
               className="flex items-center gap-2"
             >
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-neon-cyan to-neon-purple flex items-center justify-center">
-                <span className="text-white font-bold text-sm">E</span>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-secondary))' }}>
+                <span className="text-white font-bold text-sm">iF</span>
               </div>
-              <span className="text-lg font-bold bg-gradient-to-r from-neon-cyan to-neon-purple bg-clip-text text-transparent">
-                ExArt26
+              <span className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>
+                IOTA Forum
               </span>
             </motion.div>
           )}
         </AnimatePresence>
         {collapsed && (
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-neon-cyan to-neon-purple flex items-center justify-center mx-auto">
-            <span className="text-white font-bold text-sm">E</span>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center mx-auto" style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-secondary))' }}>
+            <span className="text-white font-bold text-sm">iF</span>
           </div>
         )}
         <button onClick={onToggle} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
