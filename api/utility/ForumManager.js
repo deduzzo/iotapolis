@@ -616,10 +616,13 @@ class ForumManager {
    * Upsert vote, recalculate post score.
    */
   handleForumVote(data) {
-    const existing = Vote.findOne({ id: data.id });
+    // Generate id if missing (old votes before fix didn't include id)
+    const voteId = data.id || `VOTE_${data.postId}_${data.authorId}`;
+
+    const existing = Vote.findOne({ id: voteId });
 
     if (existing) {
-      Vote.update(data.id, {
+      Vote.update(voteId, {
         vote: data.vote,
       });
     } else {
@@ -629,7 +632,7 @@ class ForumManager {
         Vote.update(duplicate.id, { vote: data.vote });
       } else {
         Vote.create({
-          id: data.id,
+          id: voteId,
           postId: data.postId,
           authorId: data.authorId,
           vote: data.vote,
