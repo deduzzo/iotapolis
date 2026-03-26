@@ -18,33 +18,75 @@ if (!fs.existsSync(USER_DATA_DIR)) {
 }
 
 // ── Auto-updater ────────────────────────────────────────────────────
-autoUpdater.autoDownload = true;
+autoUpdater.autoDownload = false; // Don't download until user clicks
 autoUpdater.autoInstallOnAppQuit = true;
 
-autoUpdater.on('update-available', (info) => {
-  if (mainWindow) {
+function sendUpdateEvent(event, data = {}) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.executeJavaScript(
-      `console.log('[updater] Update available: ${info.version}')`
+      `window.dispatchEvent(new CustomEvent('electron-update', { detail: ${JSON.stringify({ event, ...data })} }))`
     );
   }
+}
+
+autoUpdater.on('checking-for-update', () => {
+  console.log('[updater] Checking for updates...');
+  sendUpdateEvent('checking');
+});
+
+autoUpdater.on('update-available', (info) => {
+  console.log('[updater] Update available:', info.version);
+  sendUpdateEvent('available', {
+    version: info.version,
+    releaseNotes: info.releaseNotes,
+    releaseDate: info.releaseDate,
+  });
+});
+
+autoUpdater.on('update-not-available', () => {
+  console.log('[updater] No updates available');
+  sendUpdateEvent('not-available');
+});
+
+autoUpdater.on('download-progress', (progress) => {
+  sendUpdateEvent('progress', {
+    percent: Math.round(progress.percent),
+    transferred: progress.transferred,
+    total: progress.total,
+    speed: progress.bytesPerSecond,
+  });
 });
 
 autoUpdater.on('update-downloaded', (info) => {
-  dialog.showMessageBox(mainWindow, {
-    type: 'info',
-    title: 'Aggiornamento disponibile',
-    message: `Versione ${info.version} scaricata. L'app si riavvierà per installare l'aggiornamento.`,
-    buttons: ['Riavvia ora', 'Più tardi'],
-  }).then((result) => {
-    if (result.response === 0) {
-      autoUpdater.quitAndInstall();
-    }
-  });
+  console.log('[updater] Update downloaded:', info.version);
+  sendUpdateEvent('downloaded', { version: info.version });
 });
 
 autoUpdater.on('error', (err) => {
   console.log('[updater] Error:', err.message);
+  sendUpdateEvent('error', { message: err.message });
 });
+
+// Listen for renderer commands via custom protocol
+function setupUpdateIPC() {
+  if (!mainWindow) return;
+  mainWindow.webContents.on('ipc-message', (event, channel) => {
+    if (channel === 'update-download') autoUpdater.downloadUpdate();
+    if (channel === 'update-install') autoUpdater.quitAndInstall();
+  });
+  // Also listen via executeJavaScript polling
+  setInterval(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents.executeJavaScript('window.__electronUpdateAction || null')
+      .then((action) => {
+        if (!action) return;
+        mainWindow.webContents.executeJavaScript('window.__electronUpdateAction = null');
+        if (action === 'download') autoUpdater.downloadUpdate();
+        if (action === 'install') autoUpdater.quitAndInstall();
+      })
+      .catch(() => {});
+  }, 1000);
+}
 
 // ── Port checker ────────────────────────────────────────────────────
 function waitForPort(port, timeout = 30000) {
@@ -210,12 +252,13 @@ app.on('ready', async () => {
   }
 
   createWindow();
+  setupUpdateIPC();
 
-  // Check for updates (non-blocking)
+  // Check for updates at startup (non-blocking)
   if (!isDev) {
     setTimeout(() => {
-      autoUpdater.checkForUpdatesAndNotify().catch(() => {});
-    }, 5000);
+      autoUpdater.checkForUpdates().catch(() => {});
+    }, 3000);
   }
 });
 

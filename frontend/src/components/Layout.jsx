@@ -10,6 +10,7 @@ import Sidebar from './Sidebar';
 import IdentityBadge from './IdentityBadge';
 import OnboardingGuard from './OnboardingGuard';
 import Toast from './Toast';
+import UpdateNotifier from './UpdateNotifier';
 import { useTheme } from '../hooks/useTheme';
 import { useIdentity } from '../hooks/useIdentity';
 import { useApi } from '../hooks/useApi';
@@ -270,6 +271,7 @@ export default function Layout() {
 
   return (
     <ToastContext.Provider value={{ addToast }}>
+      <UpdateNotifier />
       {/* Low balance blocker modal */}
       {isLowBalance && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
