@@ -60,7 +60,15 @@ module.exports = {
         throw 'conflict';
       }
 
-      // Publish to blockchain
+      // First user becomes admin automatically
+      const allUsers = Users.findAll({});
+      const isFirstUser = !allUsers || allUsers.length === 0;
+      const role = isFirstUser ? 'admin' : 'user';
+      if (isFirstUser) {
+        console.log('[register] First user — assigning admin role to', username);
+      }
+
+      // Publish to blockchain (this also caches in local db via processTransaction)
       console.log('[register] Publishing to blockchain...');
       const ForumManager = require('../utility/ForumManager');
       const txResult = await ForumManager.publishToChain(ForumTags.FORUM_USER, userId, {
@@ -75,25 +83,12 @@ module.exports = {
       });
       console.log('[register] Blockchain publish result:', JSON.stringify(txResult));
 
-      // First user becomes admin automatically
-      const allUsers = Users.findAll({});
-      const isFirstUser = !allUsers || allUsers.length === 0;
-      const role = isFirstUser ? 'admin' : 'user';
+      // Update role if admin (processTransaction defaults to 'user')
       if (isFirstUser) {
-        console.log('[register] First user — assigning admin role to', username);
+        Users.update(userId, { role: 'admin' });
       }
 
-      // Cache in local db
-      const user = Users.create({
-        id: userId,
-        username,
-        bio: inputs.bio || null,
-        avatar: inputs.avatar || null,
-        publicKey: inputs.publicKey,
-        role,
-        createdAt: inputs.createdAt,
-      });
-      console.log('[register] User cached in local db:', userId);
+      const user = Users.findOne({ id: userId });
 
       // Update search index
       db.updateFtsIndex(userId, username, inputs.bio || '');
