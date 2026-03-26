@@ -60,6 +60,21 @@ module.exports.bootstrap = async function (done) {
     log.warn('[bootstrap] ForumManager not available, skipping sync');
   }
 
+  // 4. Start retry queue processor (every 30 seconds)
+  try {
+    const ForumManager = require('../api/utility/ForumManager');
+    if (typeof ForumManager.processRetryQueue === 'function') {
+      setInterval(() => {
+        ForumManager.processRetryQueue().catch(err => {
+          console.log('[bootstrap] Retry queue processing error:', err.message);
+        });
+      }, 30000);
+      console.log('[bootstrap] TX retry queue processor started (every 30s)');
+    }
+  } catch (err) {
+    console.log('[bootstrap] Retry queue processor not started:', err.message);
+  }
+
   console.log('[bootstrap] Bootstrap complete. Sails is lifting...');
   done();
 };

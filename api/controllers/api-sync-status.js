@@ -46,11 +46,21 @@ module.exports = {
         console.log('[api-sync-status] getPendingTxCount error:', e.message);
       }
 
+      // Retry queue status
+      let retryQueue = { pending: 0, failed: 0 };
+      try {
+        const ForumManager = require('../utility/ForumManager');
+        if (typeof ForumManager.getRetryQueueStatus === 'function') {
+          retryQueue = ForumManager.getRetryQueueStatus();
+        }
+      } catch (e) { /* ignore */ }
+
       return {
         success: true,
         sync: syncState,
         wallet: walletStatus,
         pendingTx,
+        retryQueue,
       };
     } catch (err) {
       sails.log.error('[api-sync-status]', err.message || err);

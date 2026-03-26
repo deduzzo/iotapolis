@@ -220,29 +220,182 @@ class ForumManager {
 
     const result = await iota.publishData(tag, data, entityId, data.version || 1);
 
-    if (result.success) {
-      // Update local cache immediately
-      try {
-        ensureModels();
-        this.processTransaction(tag, data);
-      } catch (err) {
-        sails.log.warn('[ForumManager] Local cache update failed after publish:', err.message);
-      }
-
-      // Broadcast real-time event
-      try {
-        await sails.helpers.broadcastEvent(tag, {
-          action: 'upsert',
-          entityId,
-          tag,
-          digest: result.digest,
-        });
-      } catch (err) {
-        sails.log.warn('[ForumManager] Broadcast failed:', err.message);
-      }
+    if (!result.success) {
+      // TX failed — add to retry queue
+      sails.log.error(`[ForumManager] TX failed for ${tag}:${entityId}: ${result.error}`);
+      this._addToRetryQueue(tag, entityId, data, result.error);
+      return result;
     }
 
-    return result;
+    // TX succeeded — verify it's actually on-chain
+    sails.log.info(`[ForumManager] TX published: ${result.digest}. Verifying on-chain...`);
+    const verified = await this._verifyOnChain(result.digest);
+
+    if (!verified) {
+      sails.log.warn(`[ForumManager] TX ${result.digest} NOT verified on-chain! Adding to retry queue.`);
+      this._addToRetryQueue(tag, entityId, data, 'TX published but not verified on-chain');
+      return { ...result, verified: false };
+    }
+
+    sails.log.info(`[ForumManager] TX ${result.digest} verified on-chain OK`);
+
+    // Only update local cache AFTER on-chain verification
+    try {
+      ensureModels();
+      this.processTransaction(tag, data);
+    } catch (err) {
+      sails.log.warn('[ForumManager] Local cache update failed after publish:', err.message);
+    }
+
+    // Broadcast real-time event
+    try {
+      await sails.helpers.broadcastEvent(tag, {
+        action: 'upsert',
+        entityId,
+        tag,
+        digest: result.digest,
+        verified: true,
+      });
+    } catch (err) {
+      sails.log.warn('[ForumManager] Broadcast failed:', err.message);
+    }
+
+    return { ...result, verified: true };
+  }
+
+  /**
+   * Verify a TX exists on-chain by its digest.
+   * Retries up to 3 times with 2s delay.
+   */
+  async _verifyOnChain(digest, maxRetries = 3) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const client = await iota.getClient();
+        const tx = await client.getTransactionBlock({ digest, options: { showEffects: true } });
+        if (tx && tx.effects?.status?.status === 'success') {
+          return true;
+        }
+        sails.log.warn(`[ForumManager] Verify attempt ${attempt}: TX ${digest} status=${tx?.effects?.status?.status}`);
+      } catch (err) {
+        sails.log.warn(`[ForumManager] Verify attempt ${attempt}: ${err.message}`);
+      }
+      if (attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Add a failed TX to the retry queue. Stored in SQLite for persistence.
+   * A background process retries these periodically.
+   */
+  _addToRetryQueue(tag, entityId, data, error) {
+    try {
+      const database = db.getDb();
+      // Create retry queue table if not exists
+      database.exec(`
+        CREATE TABLE IF NOT EXISTS tx_retry_queue (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          tag TEXT NOT NULL,
+          entityId TEXT,
+          data TEXT NOT NULL,
+          error TEXT,
+          attempts INTEGER DEFAULT 0,
+          maxAttempts INTEGER DEFAULT 5,
+          nextRetryAt INTEGER,
+          createdAt INTEGER,
+          updatedAt INTEGER
+        )
+      `);
+
+      const now = Date.now();
+      database.prepare(`
+        INSERT INTO tx_retry_queue (tag, entityId, data, error, attempts, nextRetryAt, createdAt, updatedAt)
+        VALUES (?, ?, ?, ?, 0, ?, ?, ?)
+      `).run(tag, entityId, JSON.stringify(data), error, now + 10000, now, now);
+
+      sails.log.info(`[ForumManager] Added to retry queue: ${tag}:${entityId}`);
+    } catch (err) {
+      sails.log.error('[ForumManager] Failed to add to retry queue:', err.message);
+    }
+  }
+
+  /**
+   * Process the retry queue — called periodically from bootstrap.
+   * Retries failed TXs with exponential backoff.
+   */
+  async processRetryQueue() {
+    try {
+      const database = db.getDb();
+      database.exec(`
+        CREATE TABLE IF NOT EXISTS tx_retry_queue (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          tag TEXT NOT NULL, entityId TEXT, data TEXT NOT NULL,
+          error TEXT, attempts INTEGER DEFAULT 0, maxAttempts INTEGER DEFAULT 5,
+          nextRetryAt INTEGER, createdAt INTEGER, updatedAt INTEGER
+        )
+      `);
+
+      const now = Date.now();
+      const pending = database.prepare(`
+        SELECT * FROM tx_retry_queue WHERE attempts < maxAttempts AND nextRetryAt <= ?
+      `).all(now);
+
+      if (pending.length === 0) return;
+
+      sails.log.info(`[ForumManager] Retry queue: ${pending.length} pending TXs`);
+
+      for (const item of pending) {
+        const data = JSON.parse(item.data);
+        sails.log.info(`[ForumManager] Retrying TX: ${item.tag}:${item.entityId} (attempt ${item.attempts + 1}/${item.maxAttempts})`);
+
+        const result = await iota.publishData(item.tag, data, item.entityId, data.version || 1);
+
+        if (result.success) {
+          const verified = await this._verifyOnChain(result.digest);
+          if (verified) {
+            // Success — remove from queue, update cache
+            database.prepare('DELETE FROM tx_retry_queue WHERE id = ?').run(item.id);
+            try {
+              ensureModels();
+              this.processTransaction(item.tag, data);
+            } catch (e) { /* cache update best-effort */ }
+            sails.log.info(`[ForumManager] Retry SUCCESS: ${item.tag}:${item.entityId} digest=${result.digest}`);
+            continue;
+          }
+        }
+
+        // Still failed — increment attempts, set next retry with exponential backoff
+        const nextDelay = Math.min(30000 * Math.pow(2, item.attempts), 600000); // max 10 min
+        database.prepare(`
+          UPDATE tx_retry_queue SET attempts = attempts + 1, error = ?, nextRetryAt = ?, updatedAt = ? WHERE id = ?
+        `).run(result.error || 'Verification failed', now + nextDelay, now, item.id);
+
+        sails.log.warn(`[ForumManager] Retry FAILED: ${item.tag}:${item.entityId}, next retry in ${nextDelay / 1000}s`);
+      }
+    } catch (err) {
+      sails.log.error('[ForumManager] processRetryQueue error:', err.message);
+    }
+  }
+
+  /**
+   * Get retry queue status.
+   */
+  getRetryQueueStatus() {
+    try {
+      const database = db.getDb();
+      database.exec(`CREATE TABLE IF NOT EXISTS tx_retry_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, tag TEXT NOT NULL, entityId TEXT,
+        data TEXT NOT NULL, error TEXT, attempts INTEGER DEFAULT 0,
+        maxAttempts INTEGER DEFAULT 5, nextRetryAt INTEGER, createdAt INTEGER, updatedAt INTEGER
+      )`);
+      const pending = database.prepare('SELECT COUNT(*) as count FROM tx_retry_queue WHERE attempts < maxAttempts').get();
+      const failed = database.prepare('SELECT COUNT(*) as count FROM tx_retry_queue WHERE attempts >= maxAttempts').get();
+      return { pending: pending.count, failed: failed.count };
+    } catch {
+      return { pending: 0, failed: 0 };
+    }
   }
 
   // -----------------------------------------------------------------------
