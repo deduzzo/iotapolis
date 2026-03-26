@@ -1,9 +1,10 @@
 import { useState, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Home, Clock, Edit3, Lock } from 'lucide-react';
+import { Home, Clock, Edit3, Lock, History, Save, X } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { useRealtimeUpdate } from '../hooks/useWebSocket';
+import { useTheme } from '../hooks/useTheme';
 import { api } from '../api/endpoints';
 import { useIdentity } from '../hooks/useIdentity';
 import PostCard from '../components/PostCard';
@@ -12,6 +13,7 @@ import RichEditor from '../components/RichEditor';
 import MarkdownRender from '../components/MarkdownRender';
 import VoteButtons from '../components/VoteButtons';
 import IdentityBadge from '../components/IdentityBadge';
+import BlockchainInfo from '../components/BlockchainInfo';
 import EditHistory from '../components/EditHistory';
 import LoadingSpinner from '../components/LoadingSpinner';
 
@@ -23,6 +25,8 @@ function formatDate(dateStr) {
 export default function Thread() {
   const { id } = useParams();
   const { identity, signAndSend } = useIdentity();
+  const { activeThemeId } = useTheme();
+  const isInvisionLayout = activeThemeId?.startsWith('invision');
 
   // Non passiamo realtimeEntities — gestiamo noi gli aggiornamenti granulari
   const { data, loading, error, setData } = useApi(
@@ -37,6 +41,11 @@ export default function Thread() {
   // IDs dei post appena aggiunti (per highlight visivo)
   const [freshPostIds, setFreshPostIds] = useState(new Set());
   const freshTimers = useRef({});
+
+  // Edit OP state
+  const [editingOP, setEditingOP] = useState(false);
+  const [editOPContent, setEditOPContent] = useState('');
+  const [editOPSubmitting, setEditOPSubmitting] = useState(false);
 
   /* Edit history modal */
   const [historyTarget, setHistoryTarget] = useState(null);
@@ -130,7 +139,7 @@ export default function Thread() {
     async (postId, direction) => {
       if (!identity) return;
       try {
-        const res = await signAndSend('/api/v1/vote', 'POST', { postId, direction });
+        const res = await signAndSend('/api/v1/vote', 'POST', { postId, vote: direction });
         const result = await res.json().catch(() => ({}));
 
         // Optimistic update dello score
@@ -230,6 +239,62 @@ export default function Thread() {
     },
     [identity, signAndSend, id, setData, markFresh],
   );
+
+  // Edit a post (called from PostCard)
+  const handleEditPost = useCallback(
+    async (postId, newContent) => {
+      if (!identity) return;
+      try {
+        const res = await signAndSend(`/api/v1/post/${postId}`, 'PUT', {
+          content: newContent,
+          version: 1, // server calculates real version
+        });
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(result.error || 'Edit failed');
+
+        // Optimistic update
+        setData((prev) => {
+          if (!prev) return prev;
+          const prevThread = prev.thread || prev;
+          const prevPosts = prev.posts || prevThread?.posts || [];
+          const updatedPosts = prevPosts.map((p) =>
+            p.id === postId ? { ...p, content: newContent, version: (p.version || 1) + 1, updatedAt: Date.now() } : p,
+          );
+          if (prev.posts !== undefined) return { ...prev, posts: updatedPosts };
+          return { ...prev, thread: { ...prevThread, posts: updatedPosts } };
+        });
+      } catch (err) {
+        console.error('Edit failed:', err);
+      }
+    },
+    [identity, signAndSend, setData],
+  );
+
+  // Edit OP (thread content)
+  const handleEditOP = useCallback(async () => {
+    if (!identity || !editOPContent.trim()) return;
+    setEditOPSubmitting(true);
+    try {
+      const res = await signAndSend(`/api/v1/thread/${id}`, 'PUT', {
+        title: thread?.title,
+        content: editOPContent.trim(),
+        version: 1,
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.error || 'Edit failed');
+
+      setData((prev) => {
+        if (!prev) return prev;
+        const prevThread = prev.thread || prev;
+        return { ...prev, thread: { ...prevThread, content: editOPContent.trim(), version: (prevThread.version || 1) + 1, updatedAt: Date.now() } };
+      });
+      setEditingOP(false);
+    } catch (err) {
+      console.error('Edit OP failed:', err);
+    } finally {
+      setEditOPSubmitting(false);
+    }
+  }, [identity, signAndSend, id, editOPContent, thread, setData]);
 
   if (loading) {
     return <LoadingSpinner size={32} className="min-h-[40vh]" />;
@@ -350,21 +415,51 @@ export default function Thread() {
               )}
             </div>
 
-            <div className="prose-sm">
-              <MarkdownRender content={thread.content || ''} />
-            </div>
+            {/* Content or edit form */}
+            {editingOP ? (
+              <div className="mb-3">
+                <RichEditor value={editOPContent} onChange={setEditOPContent} placeholder="Modifica il thread..." minHeight="150px" />
+                <div className="flex items-center gap-2 mt-2 justify-end">
+                  <button onClick={() => setEditingOP(false)}
+                    className="px-3 py-1.5 rounded-lg text-xs border transition-colors hover:bg-white/5"
+                    style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>
+                    <X size={12} className="inline mr-1" />Annulla
+                  </button>
+                  <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                    onClick={handleEditOP} disabled={editOPSubmitting || !editOPContent.trim()}
+                    className="btn-primary px-4 py-1.5 rounded-lg text-xs disabled:opacity-40">
+                    <Save size={12} className="inline mr-1" />{editOPSubmitting ? 'Salvataggio...' : 'Salva'}
+                  </motion.button>
+                </div>
+              </div>
+            ) : (
+              <div className="prose-sm">
+                <MarkdownRender content={thread.content || ''} />
+              </div>
+            )}
 
-            {currentUserId && currentUserId === thread.authorId && (
-              <div className="mt-4 pt-3 border-t" style={{ borderColor: 'var(--color-border)' }}>
+            {/* Actions: edit, history, blockchain */}
+            <div className="mt-4 pt-3 border-t flex items-center gap-3 flex-wrap" style={{ borderColor: 'var(--color-border)' }}>
+              {currentUserId && currentUserId === thread.authorId && !editingOP && (
                 <button
+                  onClick={() => { setEditOPContent(thread.content || ''); setEditingOP(true); }}
                   className="flex items-center gap-1 text-xs hover:underline"
                   style={{ color: 'var(--color-primary)' }}
                 >
                   <Edit3 size={12} />
                   Edit
                 </button>
-              </div>
-            )}
+              )}
+              <button
+                onClick={() => setHistoryTarget({ entityType: 'thread', entityId: thread.id })}
+                className="flex items-center gap-1 text-xs hover:underline"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
+                <History size={12} />
+                Storico{thread.version > 1 && ` (v${thread.version})`}
+              </button>
+              <BlockchainInfo entityType="thread" entityId={thread.id} />
+            </div>
           </div>
         </div>
       </motion.div>
@@ -384,6 +479,7 @@ export default function Thread() {
           depth={0}
           onReply={handleReply}
           onVote={handleVote}
+          onEdit={handleEditPost}
           currentUserId={currentUserId}
           threadLocked={isLocked}
           onShowHistory={(entityId) =>
@@ -393,6 +489,7 @@ export default function Thread() {
           onSubmitReply={submitReply}
           onCancelReply={() => setReplyToId(null)}
           freshPostIds={freshPostIds}
+          layout={isInvisionLayout ? 'table' : 'cards'}
         />
       </div>
 
