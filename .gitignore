@@ -8,3 +8,4 @@ config/private_arweave_conf.js
 *.db
 .idea/
 move/forum/build/
+move/forum/Move.lock
