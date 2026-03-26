@@ -82,51 +82,53 @@ function startSails() {
       ? path.resolve(__dirname, '..')
       : path.resolve(process.resourcesPath, 'app-server');
 
-    const nodeExe = process.execPath.includes('electron')
-      ? 'node'  // In dev, use system node
-      : process.execPath; // In packaged app, won't work — use bundled node
-
-    // In production, we use the node binary from the system or bundled
-    const env = {
-      ...process.env,
-      NODE_ENV: 'production',
-      PORT: String(PORT),
-      // Tell Sails to use user's appdata for DB, config, logs
-      FORUM_DATA_DIR: USER_DATA_DIR,
-    };
-
     console.log(`[desktop] Starting Sails from: ${appRoot}`);
 
-    sailsProcess = spawn('node', ['app.js'], {
-      cwd: appRoot,
-      env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    // Set environment
+    process.env.NODE_ENV = 'production';
+    process.env.PORT = String(PORT);
+    process.env.FORUM_DATA_DIR = USER_DATA_DIR;
 
-    sailsProcess.stdout.on('data', (data) => {
-      const msg = data.toString();
-      console.log('[sails]', msg.trim());
-      if (msg.includes('Server lifted') || msg.includes('Sails lifted')) {
-        resolve();
+    // Change working directory to app root (Sails needs this)
+    process.chdir(appRoot);
+
+    // Load Sails directly in Electron's Node.js process (no spawn needed)
+    try {
+      const sails = require(path.join(appRoot, 'node_modules', 'sails'));
+      sails.lift({
+        port: PORT,
+        environment: 'production',
+        log: { level: 'info' },
+        hooks: {
+          grunt: false, // No grunt in production
+        },
+      }, (err) => {
+        if (err) {
+          console.error('[sails] Lift error:', err.message);
+          reject(err);
+        } else {
+          console.log('[sails] Server lifted on port', PORT);
+          resolve();
+        }
+      });
+    } catch (err) {
+      console.error('[sails] Failed to require sails:', err.message);
+      // Fallback: try spawning node if available (dev mode)
+      if (isDev) {
+        const child = spawn('node', ['app.js'], {
+          cwd: appRoot,
+          env: process.env,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+        sailsProcess = child;
+        child.stdout.on('data', (d) => console.log('[sails]', d.toString().trim()));
+        child.stderr.on('data', (d) => console.error('[sails:err]', d.toString().trim()));
+        child.on('error', reject);
+        waitForPort(PORT, 30000).then(resolve).catch(reject);
+      } else {
+        reject(err);
       }
-    });
-
-    sailsProcess.stderr.on('data', (data) => {
-      console.error('[sails:err]', data.toString().trim());
-    });
-
-    sailsProcess.on('error', (err) => {
-      console.error('[sails] Failed to start:', err.message);
-      reject(err);
-    });
-
-    sailsProcess.on('exit', (code) => {
-      console.log('[sails] Exited with code:', code);
-      sailsProcess = null;
-    });
-
-    // Fallback: resolve after port is available
-    waitForPort(PORT, 30000).then(resolve).catch(reject);
+    }
   });
 }
 
