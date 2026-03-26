@@ -7,6 +7,7 @@ import {
 import { useApi } from '../hooks/useApi';
 import { api } from '../api/endpoints';
 import { useIdentity } from '../hooks/useIdentity';
+import { useToast } from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const tabs = [
@@ -79,6 +80,7 @@ export default function Admin() {
 
 function CategoriesTab() {
   const { identity, signAndSend } = useIdentity();
+  const addToast = useToast();
   const { data, loading, error, reload } = useApi(
     () => api.getCategories(),
     [],
@@ -120,20 +122,21 @@ function CategoriesTab() {
         name: name.trim(),
         description: description.trim(),
       });
-      const data = await res.json().catch(() => ({}));
+      const resData = await res.json().catch(() => ({}));
       if (!res.ok) {
-        console.error('[Admin] Create category failed:', data);
-        alert('Errore: ' + (data.error || res.statusText));
+        console.error('[Admin] Category failed:', resData);
+        addToast('Errore: ' + (resData.error || res.statusText), 'error');
         return;
       }
-      console.log('[Admin] Category created:', data);
+      console.log('[Admin] Category OK:', resData);
+      addToast(editId ? 'Categoria aggiornata' : 'Categoria creata', 'success');
       setShowForm(false);
       setName('');
       setDescription('');
       reload();
     } catch (err) {
       console.error('[Admin] Error:', err);
-      alert('Errore: ' + err.message);
+      addToast('Errore: ' + err.message, 'error');
     } finally {
       setSubmitting(false);
     }

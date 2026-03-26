@@ -6,11 +6,10 @@ module.exports = {
   description: 'Create a new forum category (admin only).',
 
   inputs: {
-    id: { type: 'string', required: true },
     name: { type: 'string', required: true },
     description: { type: 'string', allowNull: true },
     sortOrder: { type: 'number', defaultsTo: 0 },
-    authorId: { type: 'string', required: true },
+    authorId: { type: 'string' },
     nonce: { type: 'string', required: true },
     version: { type: 'number', defaultsTo: 1 },
     createdAt: { type: 'number', required: true },
@@ -28,11 +27,6 @@ module.exports = {
     try {
       const { userId } = await sails.helpers.verifySignature(this.req.body);
 
-      if (userId !== inputs.authorId) {
-        this.res.status(403);
-        return { success: false, error: 'Author mismatch' };
-      }
-
       // Check admin role
       const Users = db.getModel('users');
       const user = Users.findOne({ id: userId });
@@ -40,17 +34,13 @@ module.exports = {
         throw 'forbidden';
       }
 
-      // Validate id format: CAT_ + nonce first 8
-      const expectedId = 'CAT_' + inputs.nonce.substring(0, 8);
-      if (inputs.id !== expectedId) {
-        this.res.status(400);
-        return { success: false, error: 'Invalid category ID format' };
-      }
+      // Generate id from nonce
+      const categoryId = 'CAT_' + inputs.nonce.substring(0, 8);
 
       // Publish to blockchain
       const ForumManager = require('../utility/ForumManager');
-      const txResult = await ForumManager.publishToChain(ForumTags.FORUM_CATEGORY, inputs.id, {
-        id: inputs.id,
+      const txResult = await ForumManager.publishToChain(ForumTags.FORUM_CATEGORY, categoryId, {
+        id: categoryId,
         name: inputs.name,
         description: inputs.description || null,
         authorId: userId,
@@ -59,22 +49,20 @@ module.exports = {
         createdAt: inputs.createdAt,
       });
 
-      // Cache
+      if (!txResult.success || txResult.verified === false) {
+        this.res.status(503);
+        return { success: false, error: 'Blockchain TX failed: ' + (txResult.error || 'not verified') };
+      }
+
+      // publishToChain already cached via processTransaction
       const Categories = db.getModel('categories');
-      const category = Categories.create({
-        id: inputs.id,
-        name: inputs.name,
-        description: inputs.description || null,
-        createdBy: userId,
-        sortOrder: inputs.sortOrder || 0,
-        createdAt: inputs.createdAt,
-      });
+      const category = Categories.findOne({ id: categoryId });
 
       // Broadcast
       await sails.helpers.broadcastEvent('dataChanged', {
         action: 'categoryCreated',
         label: inputs.name,
-        categoryId: inputs.id,
+        categoryId,
       });
 
       return {
