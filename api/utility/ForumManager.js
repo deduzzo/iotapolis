@@ -831,10 +831,11 @@ class ForumManager {
    * Call this periodically (e.g. every 30 seconds).
    */
   async pollNewEvents() {
-    if (!iota.isMoveModeEnabled()) return; // Solo Move mode ha gli eventi
+    if (!iota.isMoveModeEnabled()) return;
 
     // Prima sync completa imposta il cursor
     if (!this._lastEventCursor && this._syncState.status !== 'idle') return;
+    if (!this._pollReady) return; // Skip until cursor is initialized
 
     try {
       const { events, lastCursor } = await iota.queryForumEventsSince(this._lastEventCursor);
@@ -896,9 +897,11 @@ class ForumManager {
   async initEventCursor() {
     if (!iota.isMoveModeEnabled()) return;
     try {
+      // Scan all existing events to advance cursor past them (no processing needed, already synced)
       const { lastCursor } = await iota.queryForumEventsSince(null);
       this._lastEventCursor = lastCursor;
-      sails.log.info(`[ForumManager] Event cursor initialized`);
+      this._pollReady = true;
+      sails.log.info(`[ForumManager] Event cursor initialized — polling ready`);
     } catch (err) {
       sails.log.warn('[ForumManager] Failed to init event cursor:', err.message);
     }
