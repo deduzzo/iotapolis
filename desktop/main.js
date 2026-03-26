@@ -18,8 +18,9 @@ if (!fs.existsSync(USER_DATA_DIR)) {
 }
 
 // ── Auto-updater ────────────────────────────────────────────────────
-autoUpdater.autoDownload = false; // Don't download until user clicks
+autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
+autoUpdater.forceCodeSigning = false; // Allow unsigned app updates
 
 function logToRenderer(msg) {
   if (mainWindow && !mainWindow.isDestroyed()) {
