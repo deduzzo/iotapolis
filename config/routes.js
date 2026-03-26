@@ -31,4 +31,18 @@ module.exports.routes = {
   'POST /api/v1/sync-connect': { action: 'sync-connect' },
   'POST /api/v1/full-reset': { action: 'full-reset' },
   'GET /api/v1/integrity-check': { action: 'api-integrity-check' },
+
+  // SPA catch-all: serve index.html for all non-API routes (React Router)
+  'GET /*': {
+    skipAssets: true,
+    fn: function (req, res) {
+      const path = require('path');
+      const fs = require('fs');
+      const indexPath = path.resolve(sails.config.appPath, '.tmp', 'public', 'index.html');
+      if (fs.existsSync(indexPath)) {
+        return res.sendFile(indexPath);
+      }
+      return res.notFound();
+    },
+  },
 };
