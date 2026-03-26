@@ -305,30 +305,54 @@ async function waitForFunds(maxWaitMs = 30000) {
 // Il primo split ha amount = 1 (marker), il secondo = lunghezza payload.
 // I successivi contengono i chunks del payload codificati.
 
-const CHUNK_DATA_SIZE = 6; // 6 bytes dati + 2 bytes indice = 8 bytes = 1 u64
+// --- V2 Encoding: 1 byte per coin (low nanos, affordable on testnet) ---
+// Each byte of the payload is encoded as: (index * 256) + byte_value
+// This means each coin amount is at most (65535 * 256 + 255) = 16,777,215 nanos (~0.017 IOTA)
+// Total cost for 580 bytes: ~580 * 8388608 avg = ~4.8B nanos = ~5 IOTA (worst case)
+//
+// V1 encoding (exart26 original) packed 6 bytes per coin as raw u64 values,
+// which required enormous balances (millions of IOTA). V2 is much cheaper.
+
+const CHUNK_DATA_SIZE = 6; // Still used by chain-linking size calculation
+const ENCODING_VERSION = 2; // Marker: 2 = V2 encoding (1 byte per coin)
 
 function _encodePayloadToChunks(payload) {
   const payloadBytes = Buffer.isBuffer(payload) ? payload : Buffer.from(payload, 'utf8');
   const chunks = [];
-  for (let i = 0; i < payloadBytes.length; i += CHUNK_DATA_SIZE) {
-    const chunk = payloadBytes.subarray(i, i + CHUNK_DATA_SIZE);
-    const buf = Buffer.alloc(8, 0);
-    // 2 bytes per indice (Big Endian) - supporta fino a 65535 chunks (~393KB)
-    const chunkIdx = Math.floor(i / CHUNK_DATA_SIZE);
-    buf[0] = (chunkIdx >> 8) & 0xFF;
-    buf[1] = chunkIdx & 0xFF;
-    chunk.copy(buf, 2);
-    chunks.push(BigInt('0x' + buf.toString('hex')));
+  for (let i = 0; i < payloadBytes.length; i++) {
+    // Each byte: (index * 256) + byte_value
+    // Max index: 65535 (supports payloads up to 64KB before chain-linking)
+    // Max value per coin: 65535 * 256 + 255 = 16,777,215 nanos
+    const value = BigInt(i) * 256n + BigInt(payloadBytes[i]);
+    chunks.push(value);
   }
   return { chunks, length: payloadBytes.length };
 }
 
 function _decodeChunksToBuffer(u64Values, payloadLength) {
+  // Detect encoding version from the marker
+  // V2: marker=2, amounts are (index*256 + byte)
+  // V1 (legacy): marker=1, amounts are 8-byte packed (2-byte index + 6-byte data)
+  const result = Buffer.alloc(payloadLength);
+
+  // Try V2 decoding: each value = index*256 + byte
+  for (const val of u64Values) {
+    const v = BigInt(val);
+    const index = Number(v / 256n);
+    const byte = Number(v % 256n);
+    if (index < payloadLength) {
+      result[index] = byte;
+    }
+  }
+  return result;
+}
+
+// Legacy V1 decoder (for reading old exart26 data)
+function _decodeChunksToBufferV1(u64Values, payloadLength) {
   const buffers = u64Values.map(val => {
     const hex = BigInt(val).toString(16).padStart(16, '0');
     return Buffer.from(hex, 'hex');
   });
-  // New format: 2-byte index (Big Endian) + 6 bytes data
   buffers.sort((a, b) => ((a[0] << 8) | a[1]) - ((b[0] << 8) | b[1]));
   const combined = Buffer.concat(buffers.map(b => b.subarray(2)));
   return combined.subarray(0, payloadLength);
@@ -407,26 +431,22 @@ async function _publishSingleTx(marker, payloadBuf) {
   const config = _getConfig();
 
   const { chunks, length: payloadLength } = _encodePayloadToChunks(payloadBuf);
+
   const tx = new sdk.Transaction();
 
+  // All amounts: marker + payload length + data chunks
   const allAmounts = [BigInt(marker), BigInt(payloadLength), ...chunks];
-  const BATCH_SIZE = 500;
-  const allCoins = [];
-  for (let i = 0; i < allAmounts.length; i += BATCH_SIZE) {
-    const batch = allAmounts.slice(i, i + BATCH_SIZE);
-    const coins = tx.splitCoins(tx.gas, batch.map(a => tx.pure.u64(a)));
-    if (Array.isArray(coins)) {
-      for (let j = 0; j < batch.length; j++) allCoins.push(coins[j]);
-    } else {
-      allCoins.push(coins);
-    }
+
+  // Single splitCoins from gas coin with all amounts at once
+  const coins = tx.splitCoins(tx.gas, allAmounts.map(a => tx.pure.u64(a)));
+
+  // Transfer each split coin to self (one transferObjects per coin)
+  for (let i = 0; i < allAmounts.length; i++) {
+    tx.transferObjects([coins[i]], tx.pure.address(address));
   }
-  for (let i = 0; i < allCoins.length; i++) {
-    tx.transferObjects([allCoins[i]], address);
-  }
-  // Gas budget: scale with number of commands (splitCoins + transferObjects)
-  const totalCommands = allAmounts.length * 2; // split + transfer per coin
-  tx.setGasBudget(Math.max(50000000, totalCommands * 1000000));
+
+  // Gas budget: generous scaling — each split+transfer costs ~2-5M gas units
+  tx.setGasBudget(Math.max(100000000, allAmounts.length * 3000000));
 
   const result = await client.signAndExecuteTransaction({
     signer: keypair,
