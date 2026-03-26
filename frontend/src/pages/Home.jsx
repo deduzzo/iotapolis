@@ -45,6 +45,13 @@ export default function Home() {
   );
   const isAdmin = userProfile?.user?.role === 'admin';
 
+  // All hooks MUST be before any conditional return
+  const [forumInfo, setForumInfo] = useState(null);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    fetch('/api/v1/forum-info').then(r => r.json()).then(d => setForumInfo(d)).catch(() => {});
+  }, []);
+
   if (loading) {
     return <LoadingSpinner size={32} className="min-h-[40vh]" />;
   }
@@ -87,12 +94,6 @@ export default function Home() {
       </div>
     );
   }
-
-  const [forumInfo, setForumInfo] = useState(null);
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    fetch('/api/v1/forum-info').then(r => r.json()).then(d => setForumInfo(d)).catch(() => {});
-  }, []);
 
   function copyConnectionString() {
     if (forumInfo?.connectionString) {
