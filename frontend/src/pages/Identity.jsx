@@ -1,8 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Key, User, Download, Upload, Shield, Copy, RefreshCw,
-  CheckCircle, AlertTriangle, ChevronDown, ChevronUp, Fingerprint,
+  CheckCircle, AlertTriangle, ChevronDown, ChevronUp, Fingerprint, Eye, EyeOff, Loader2,
 } from 'lucide-react';
 import { useIdentity } from '../hooks/useIdentity';
 
@@ -271,10 +271,40 @@ function UsernameCard({ identity, onRegister, onExport }) {
 // ---------------------------------------------------------------------------
 
 function RegisteredCard({ identity, onExport, onImport, onGenerate, onClear }) {
+  const { signAndSend } = useIdentity();
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [privacyLoading, setPrivacyLoading] = useState(false);
+  const [showUsername, setShowUsername] = useState(false);
   const fileRef = useRef(null);
+
+  // Fetch current privacy setting
+  useEffect(() => {
+    if (identity?.userId) {
+      fetch(`/api/v1/user/${identity.userId}`)
+        .then(r => r.json())
+        .then(d => { if (d.user) setShowUsername(!!d.user.showUsername); })
+        .catch(() => {});
+    }
+  }, [identity?.userId]);
+
+  async function togglePrivacy() {
+    setPrivacyLoading(true);
+    try {
+      const newVal = !showUsername;
+      const res = await signAndSend(`/api/v1/user/${identity.userId}`, 'PUT', {
+        showUsername: newVal,
+      });
+      if (res.ok) {
+        setShowUsername(newVal);
+      }
+    } catch (e) {
+      console.error('[Identity] Privacy toggle error:', e);
+    } finally {
+      setPrivacyLoading(false);
+    }
+  }
 
   function handleCopy() {
     navigator.clipboard.writeText(identity.userId);
@@ -359,6 +389,41 @@ function RegisteredCard({ identity, onExport, onImport, onGenerate, onClear }) {
             </motion.pre>
           )}
         </AnimatePresence>
+
+        {/* Privacy toggle */}
+        <div className="mt-3 pt-3 border-t" style={{ borderColor: 'var(--color-border)' }}>
+          <button
+            onClick={togglePrivacy}
+            disabled={privacyLoading}
+            className="flex items-center justify-between w-full py-2 px-3 rounded-lg hover:bg-white/5 transition-colors text-sm"
+          >
+            <div className="flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
+              {showUsername ? <Eye size={14} /> : <EyeOff size={14} />}
+              <span>
+                {showUsername
+                  ? <>Username <strong style={{ color: 'var(--color-success)' }}>visibile</strong> a tutti</>
+                  : <>Username <strong style={{ color: 'var(--color-warning)' }}>nascosto</strong> — mostrato come {identity.userId?.slice(0, 12)}...</>
+                }
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {privacyLoading && <Loader2 size={14} className="animate-spin" style={{ color: 'var(--color-primary)' }} />}
+              <div
+                className="w-10 h-5 rounded-full transition-colors relative"
+                style={{ backgroundColor: showUsername ? 'var(--color-success)' : 'var(--color-border)' }}
+              >
+                <motion.div
+                  animate={{ x: showUsername ? 20 : 2 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  className="w-4 h-4 rounded-full bg-white absolute top-0.5"
+                />
+              </div>
+            </div>
+          </button>
+          <p className="text-xs mt-1 px-3" style={{ color: 'var(--color-text-muted)' }}>
+            Questa preferenza viene salvata sulla blockchain. Default: nascosto.
+          </p>
+        </div>
       </div>
 
       {/* Actions */}

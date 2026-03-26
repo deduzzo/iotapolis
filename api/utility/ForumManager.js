@@ -437,6 +437,7 @@ class ForumManager {
         avatar: data.avatar,
         publicKey: data.publicKey,
         role: data.role || existing.role || 'user',
+        showUsername: data.showUsername != null ? (data.showUsername ? 1 : 0) : existing.showUsername,
         updatedAt: data.updatedAt || Date.now(),
       });
     } else {
@@ -451,6 +452,7 @@ class ForumManager {
         avatar: data.avatar || null,
         publicKey: data.publicKey,
         role: data.role || (isFirstUser ? 'admin' : 'user'),
+        showUsername: data.showUsername ? 1 : 0,
         createdAt: data.createdAt || Date.now(),
         updatedAt: data.updatedAt || Date.now(),
       });

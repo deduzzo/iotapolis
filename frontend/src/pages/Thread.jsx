@@ -180,6 +180,7 @@ export default function Thread() {
               <IdentityBadge
                 userId={thread.authorId}
                 username={thread.authorUsername || thread.authorName}
+                showUsername={!!thread.authorShowUsername}
                 size="sm"
               />
               <span

@@ -69,6 +69,7 @@ export default function PostCard({
             <IdentityBadge
               userId={post.authorId}
               username={post.authorUsername || post.authorName}
+              showUsername={!!post.authorShowUsername}
               size="sm"
             />
             <span

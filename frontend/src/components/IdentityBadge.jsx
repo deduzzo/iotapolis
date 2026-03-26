@@ -30,11 +30,18 @@ function avatarGradient(userId) {
  *   username — display name (optional, falls back to truncated userId)
  *   size     — 'sm' | 'md' | 'lg'
  */
-export default function IdentityBadge({ userId, username, size = 'md' }) {
+/**
+ * Props:
+ *   userId       — full USR_XXXXXXXXXXXXXXXX
+ *   username     — display name (optional)
+ *   showUsername  — if false, always show placeholder even if username exists (privacy)
+ *   size         — 'sm' | 'md' | 'lg'
+ */
+export default function IdentityBadge({ userId, username, showUsername = true, size = 'md' }) {
   const [showTooltip, setShowTooltip] = useState(false);
   const s = sizeMap[size] || sizeMap.md;
 
-  const displayName = username || userId?.slice(0, 12) || '???';
+  const displayName = (showUsername && username) ? username : (userId?.slice(0, 12) || '???');
   const initial = (username?.[0] || userId?.[4] || '?').toUpperCase();
   const truncatedId = userId ? `${userId.slice(0, 12)}...` : '';
 

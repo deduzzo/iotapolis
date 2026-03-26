@@ -8,6 +8,7 @@ module.exports = {
   inputs: {
     bio: { type: 'string', allowNull: true },
     avatar: { type: 'string', allowNull: true },
+    showUsername: { type: 'boolean' },
     authorId: { type: 'string' },
     nonce: { type: 'string', required: true },
     version: { type: 'number', required: true },
@@ -46,6 +47,7 @@ module.exports = {
         username: user.username,
         bio: inputs.bio !== undefined ? inputs.bio : user.bio,
         avatar: inputs.avatar !== undefined ? inputs.avatar : user.avatar,
+        showUsername: inputs.showUsername !== undefined ? inputs.showUsername : !!user.showUsername,
         publicKey: inputs.publicKey,
         nonce: inputs.nonce,
         version: newVersion,

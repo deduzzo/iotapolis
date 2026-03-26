@@ -1,5 +1,8 @@
 module.exports.custom = {
+  // Server port (change here + in frontend vite.config.js proxy)
+  // Default: backend 1337, frontend 5173
   baseUrl: 'http://localhost:1337',
+
   forumName: 'IOTA Free Forum',
   postsPerPage: 20,
   threadsPerPage: 20,

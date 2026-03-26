@@ -37,6 +37,7 @@ function initDb() {
       avatar TEXT,
       publicKey TEXT NOT NULL,
       role TEXT DEFAULT 'user',
+      showUsername INTEGER DEFAULT 0,
       createdAt INTEGER,
       updatedAt INTEGER
     );
@@ -334,7 +335,8 @@ function getThreadsByCategory(categoryId, page = 1, perPage = 20) {
     SELECT
       t.*,
       u.username as authorUsername,
-      u.avatar as authorAvatar
+      u.avatar as authorAvatar,
+      u.showUsername as authorShowUsername
     FROM threads t
     LEFT JOIN users u ON t.authorId = u.id
     WHERE t.categoryId = ? AND t.hidden = 0
@@ -356,7 +358,8 @@ function getThreadDetail(threadId) {
     SELECT
       t.*,
       u.username as authorUsername,
-      u.avatar as authorAvatar
+      u.avatar as authorAvatar,
+      u.showUsername as authorShowUsername
     FROM threads t
     LEFT JOIN users u ON t.authorId = u.id
     WHERE t.id = ?
@@ -368,7 +371,8 @@ function getThreadDetail(threadId) {
     SELECT
       p.*,
       u.username as authorUsername,
-      u.avatar as authorAvatar
+      u.avatar as authorAvatar,
+      u.showUsername as authorShowUsername
     FROM posts p
     LEFT JOIN users u ON p.authorId = u.id
     WHERE p.threadId = ? AND p.hidden = 0
