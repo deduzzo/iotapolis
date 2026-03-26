@@ -10,7 +10,7 @@ module.exports = {
 
   fn: async function () {
     try {
-      let syncState = { status: 'unknown', lastSync: null };
+      let syncState = { status: 'idle', lastSync: null };
 
       try {
         const ForumManager = require('../utility/ForumManager');
@@ -18,23 +18,39 @@ module.exports = {
           syncState = ForumManager.getSyncState();
         }
       } catch (e) {
-        syncState = { status: 'unavailable', error: e.message };
+        console.log('[api-sync-status] ForumManager getSyncState not available:', e.message);
+        syncState = { status: 'idle', lastSync: null };
       }
 
       // IOTA wallet status
       let walletStatus = null;
       try {
         const iota = require('../utility/iota');
-        walletStatus = await iota.getStatusAndBalance();
+        if (typeof iota.getStatusAndBalance === 'function') {
+          walletStatus = await iota.getStatusAndBalance();
+        } else {
+          walletStatus = { status: 'unknown' };
+        }
       } catch (e) {
         walletStatus = { status: 'error', error: e.message };
+      }
+
+      // Pending TX count (safe default)
+      let pendingTx = 0;
+      try {
+        const iota = require('../utility/iota');
+        if (typeof iota.getPendingTxCount === 'function') {
+          pendingTx = iota.getPendingTxCount();
+        }
+      } catch (e) {
+        console.log('[api-sync-status] getPendingTxCount error:', e.message);
       }
 
       return {
         success: true,
         sync: syncState,
         wallet: walletStatus,
-        pendingTx: require('../utility/iota').getPendingTxCount(),
+        pendingTx,
       };
     } catch (err) {
       sails.log.error('[api-sync-status]', err.message || err);

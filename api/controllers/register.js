@@ -24,19 +24,24 @@ module.exports = {
   },
 
   fn: async function (inputs) {
+    console.log('[register] Incoming request. username:', inputs.username, 'publicKey length:', inputs.publicKey?.length);
     try {
       // Verify signature + anti-replay
+      console.log('[register] Calling verifySignature...');
       const { userId } = await sails.helpers.verifySignature(this.req.body);
+      console.log('[register] Signature verified. userId:', userId);
 
       // Validate username: 3-20 chars, alphanumeric + underscore
       const username = inputs.username.trim();
       if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+        console.log('[register] Invalid username format:', username);
         throw 'badRequest';
       }
 
       // Check reserved usernames
       const reserved = ['admin', 'moderator', 'system', 'null', 'undefined'];
       if (reserved.includes(username.toLowerCase())) {
+        console.log('[register] Reserved username:', username);
         throw 'badRequest';
       }
 
@@ -44,18 +49,22 @@ module.exports = {
       const Users = db.getModel('users');
       const existingUsername = Users.findOne({ username });
       if (existingUsername) {
+        console.log('[register] Username already taken:', username);
         throw 'conflict';
       }
 
       // Check if user already registered with this publicKey
       const existingUser = Users.findOne({ id: userId });
       if (existingUser) {
+        console.log('[register] User already registered with this publicKey. userId:', userId);
         throw 'conflict';
       }
 
       // Publish to blockchain
+      console.log('[register] Publishing to blockchain...');
       const ForumManager = require('../utility/ForumManager');
       const txResult = await ForumManager.publishToChain(ForumTags.FORUM_USER, userId, {
+        id: userId,
         username,
         bio: inputs.bio || null,
         avatar: inputs.avatar || null,
@@ -64,6 +73,7 @@ module.exports = {
         version: 1,
         createdAt: inputs.createdAt,
       });
+      console.log('[register] Blockchain publish result:', JSON.stringify(txResult));
 
       // Cache in local db
       const user = Users.create({
@@ -75,6 +85,7 @@ module.exports = {
         role: 'user',
         createdAt: inputs.createdAt,
       });
+      console.log('[register] User cached in local db:', userId);
 
       // Update search index
       db.updateFtsIndex(userId, username, inputs.bio || '');
@@ -86,6 +97,7 @@ module.exports = {
         userId,
       });
 
+      console.log('[register] Registration complete for:', username);
       return {
         success: true,
         user,
@@ -94,6 +106,7 @@ module.exports = {
     } catch (err) {
       if (err === 'badRequest') throw 'badRequest';
       if (err === 'conflict') throw 'conflict';
+      console.log('[register] ERROR:', err.message || err, err.stack || '');
       sails.log.error('[register]', err.message || err);
       this.res.status(err.message?.includes('signature') || err.message?.includes('nonce') ? 400 : 500);
       return { success: false, error: err.message || String(err) };

@@ -32,8 +32,8 @@ module.exports = {
       // Start resync in background
       try {
         const ForumManager = require('../utility/ForumManager');
-        if (ForumManager && typeof ForumManager.syncFromChain === 'function') {
-          ForumManager.syncFromChain().then(() => {
+        if (ForumManager && typeof ForumManager.syncFromBlockchain === 'function') {
+          ForumManager.syncFromBlockchain().then(() => {
             sails.log.info('[sync-reset] Resync completed');
           }).catch((err) => {
             sails.log.warn('[sync-reset] Resync failed:', err.message);

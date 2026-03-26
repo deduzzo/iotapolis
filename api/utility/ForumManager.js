@@ -207,6 +207,7 @@ class ForumManager {
    * @returns {{ success, digest, error }}
    */
   async publishToChain(tag, entityId, data) {
+    console.log(`[ForumManager] publishToChain called: tag=${tag}, entityId=${entityId}, data=`, JSON.stringify(data).substring(0, 200));
     sails.log.info(`[ForumManager] Publishing ${tag} entityId=${entityId}`);
 
     const result = await iota.publishData(tag, data, entityId, data.version || 1);
@@ -608,4 +609,4 @@ class ForumManager {
   }
 }
 
-module.exports = ForumManager;
+module.exports = new ForumManager();
