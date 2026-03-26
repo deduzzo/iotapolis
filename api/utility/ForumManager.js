@@ -908,6 +908,91 @@ class ForumManager {
   }
 
   // -----------------------------------------------------------------------
+  // 7. repairSync — Auto-repair missing data
+  // -----------------------------------------------------------------------
+
+  /**
+   * Compare local cache with blockchain and re-process any missing events.
+   * Called periodically to ensure eventual consistency.
+   */
+  async repairSync() {
+    if (!iota.isMoveModeEnabled()) return;
+
+    try {
+      const byTag = await iota.queryForumEvents();
+      ensureModels();
+
+      let repaired = 0;
+      const forumTags = Object.keys(TAG_HANDLERS);
+
+      for (const tag of forumTags) {
+        const records = byTag[tag] || [];
+        // Sort by version ascending
+        records.sort((a, b) => (a.version || 0) - (b.version || 0));
+
+        for (const record of records) {
+          try {
+            const data = typeof record.payload === 'string'
+              ? JSON.parse(record.payload)
+              : record.payload;
+
+            const entityId = data.id || record.entityId;
+            if (!entityId) continue;
+
+            // Check if entity exists in local cache
+            let model, existing;
+            switch (tag) {
+              case FORUM_USER: model = User; break;
+              case FORUM_CATEGORY: model = Category; break;
+              case FORUM_THREAD: model = Thread; break;
+              case FORUM_POST: model = Post; break;
+              case FORUM_VOTE:
+                // Votes: check by id OR by postId+authorId
+                existing = Vote.findOne({ id: entityId });
+                if (!existing && data.postId && data.authorId) {
+                  existing = Vote.findOne({ postId: data.postId, authorId: data.authorId });
+                }
+                if (!existing) {
+                  this.processTransaction(tag, data);
+                  repaired++;
+                }
+                continue;
+              default: continue;
+            }
+
+            if (model) {
+              existing = model.findOne({ id: entityId });
+              if (!existing) {
+                this.processTransaction(tag, data);
+                repaired++;
+              }
+            }
+          } catch (err) {
+            // Skip individual errors, continue repairing
+          }
+        }
+      }
+
+      if (repaired > 0) {
+        sails.log.info(`[ForumManager] Repair: fixed ${repaired} missing entries`);
+        // Broadcast a general refresh
+        try {
+          await sails.helpers.broadcastEvent('dataChanged', {
+            entity: 'sync',
+            action: 'repairCompleted',
+            label: `${repaired} entries repaired`,
+          });
+        } catch (e) { /* best effort */ }
+      }
+
+      return repaired;
+    } catch (err) {
+      sails.log.warn('[ForumManager] Repair failed:', err.message);
+      return 0;
+    }
+  }
+
+  // -----------------------------------------------------------------------
   // Internal helpers
   // -----------------------------------------------------------------------
 

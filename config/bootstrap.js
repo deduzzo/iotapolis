@@ -157,6 +157,20 @@ module.exports.bootstrap = async function (done) {
             });
           }, 30000);
           console.log('[bootstrap] Blockchain polling started (30s interval)');
+
+          // Auto-repair: check and fix missing data every 60s
+          setInterval(() => {
+            ForumManager.repairSync().catch(err => {
+              sails.log.warn('[repair] Error:', err.message);
+            });
+          }, 60000);
+          // First repair after 10s to catch any issues from initial sync
+          setTimeout(() => {
+            ForumManager.repairSync().catch(err => {
+              sails.log.warn('[repair] Error:', err.message);
+            });
+          }, 10000);
+          console.log('[bootstrap] Auto-repair started (60s interval, first run in 10s)');
         } catch (cursorErr) {
           console.log('[bootstrap] Event cursor init failed:', cursorErr.message);
         }

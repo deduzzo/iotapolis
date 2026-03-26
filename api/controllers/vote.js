@@ -45,6 +45,7 @@ module.exports = {
       // Publish to blockchain (processTransaction handles cache)
       const ForumManager = require('../utility/ForumManager');
       const txResult = await ForumManager.publishToChain(ForumTags.FORUM_VOTE, voteId, {
+        id: voteId,
         postId: inputs.postId,
         vote: inputs.vote,
         authorId: userId,
