@@ -3,7 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Home, BarChart3, Fingerprint, ShieldCheck,
-  Search, Wifi, WifiOff, Menu, Settings,
+  Search, Wifi, WifiOff, Menu, Settings, Globe,
 } from 'lucide-react';
 import Sidebar from './Sidebar';
 import IdentityBadge from './IdentityBadge';
@@ -33,6 +33,7 @@ const navItems = [
   { to: '/identity', icon: Fingerprint, label: 'Identity', group: 'Account' },
   { to: '/admin', icon: ShieldCheck, label: 'Admin', group: 'Account' },
   { to: '/settings', icon: Settings, label: 'Impostazioni', group: 'Account' },
+  { to: '/setup', icon: Globe, label: 'Setup / Connetti', group: 'Account' },
 ];
 
 /* ── Layout ────────────────────────────────────────────────────── */

@@ -44,4 +44,8 @@ export const api = {
   // Search
   search: (q) =>
     fetch(`${API_BASE}/search?q=${encodeURIComponent(q)}`).then((r) => r.json()),
+
+  // Forum info
+  getForumInfo: () =>
+    fetch(`${API_BASE}/forum-info`).then((r) => r.json()),
 };

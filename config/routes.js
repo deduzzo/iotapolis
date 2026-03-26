@@ -27,4 +27,6 @@ module.exports.routes = {
   'GET /api/v1/sync-status': { action: 'api-sync-status' },
   'POST /api/v1/sync-reset': { action: 'api-sync-reset' },
   'GET /api/v1/export-data': { action: 'export-data' },
+  'GET /api/v1/forum-info': { action: 'api-forum-info' },
+  'POST /api/v1/sync-connect': { action: 'sync-connect' },
 };

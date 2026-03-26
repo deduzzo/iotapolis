@@ -10,6 +10,7 @@ import Admin from './pages/Admin';
 import ThemeAdmin from './pages/ThemeAdmin';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
+import Setup from './pages/Setup';
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="/admin/theme" element={<ThemeAdmin />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/setup" element={<Setup />} />
       </Route>
     </Routes>
   );
