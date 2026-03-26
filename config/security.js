@@ -1,5 +1,6 @@
-// Frontend port — deve corrispondere a config/custom.js > frontendPort
-const frontendPort = require('./custom').custom.frontendPort || 5173;
+// Frontend port — letta da private_iota_conf.js
+let frontendPort = 5173;
+try { frontendPort = require('./private_iota_conf').FRONTEND_PORT || 5173; } catch (e) { /* */ }
 
 module.exports.security = {
   cors: {

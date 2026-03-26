@@ -2,12 +2,12 @@ const sails = require('sails');
 const rc = require('sails/accessible/rc');
 const config = rc('sails');
 
-// Use port from config/custom.js or env variable
+// Read port from private_iota_conf.js (single source of truth)
 try {
-  const custom = require('./config/custom').custom;
-  if (custom.port && !process.env.PORT) {
-    config.port = custom.port;
+  const privateConf = require('./config/private_iota_conf');
+  if (privateConf.PORT && !process.env.PORT) {
+    config.port = privateConf.PORT;
   }
-} catch (e) { /* use default */ }
+} catch (e) { /* file doesn't exist yet — bootstrap will create it */ }
 
 sails.lift(config);

@@ -36,21 +36,27 @@ function ensureConfigFile() {
 // DO NOT commit this file (it's in .gitignore)
 
 module.exports = {
-  // Network: 'testnet' | 'mainnet' | 'devnet'
+  // ── Porte ──────────────────────────────────────────────────────
+  // Backend (Sails.js)
+  PORT: 1337,
+  // Frontend (Vite dev server)
+  FRONTEND_PORT: 5173,
+
+  // ── Rete IOTA ─────────────────────────────────────────────────
+  // 'testnet' | 'mainnet' | 'devnet'
   IOTA_NETWORK: 'testnet',
 
-  // Custom node URL (null = use network default)
+  // URL nodo custom (null = usa il default della rete)
   IOTA_NODE_URL: null,
 
-  // BIP39 mnemonic for Ed25519 keypair
-  // Auto-generated on first wallet init if null
+  // Mnemonic BIP39 — generato automaticamente al primo avvio
   IOTA_MNEMONIC: null,
 
-  // RSA-2048 keys for data encryption
+  // ── Chiavi RSA-2048 ───────────────────────────────────────────
   MAIN_PRIVATE_KEY: '${escPriv}',
   MAIN_PUBLIC_KEY: '${escPub}',
 
-  // Explorer URL
+  // ── Explorer ──────────────────────────────────────────────────
   IOTA_EXPLORER_URL: 'https://explorer.rebased.iota.org',
 };
 `;

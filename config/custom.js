@@ -1,10 +1,5 @@
 module.exports.custom = {
-  // ── Porte ──────────────────────────────────────────────────────
-  // Backend (Sails.js): cambia qui. Sails legge process.env.PORT o questo valore.
-  port: 1337,
-  // Frontend (Vite dev server): cambia qui E in frontend/vite.config.js
-  frontendPort: 5173,
-  // URL base del backend (usato per CORS e link interni)
+  // Porte: configurate in config/private_iota_conf.js (PORT, FRONTEND_PORT)
   baseUrl: 'http://localhost:1337',
 
   forumName: 'IOTA Free Forum',
