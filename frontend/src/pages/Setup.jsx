@@ -319,7 +319,7 @@ export default function Setup() {
             </div>
 
             <button
-              onClick={() => window.location.href = '/'}
+              onClick={() => { localStorage.setItem('forum_setup_done', 'create'); window.location.href = '/identity'; }}
               className="w-full py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-all"
               style={{
                 backgroundColor: 'var(--color-primary)',
@@ -426,20 +426,40 @@ export default function Setup() {
                 </AnimatePresence>
 
                 <div className="flex gap-3">
-                  <button
-                    onClick={testConnection}
-                    disabled={!connectAddress.trim() || connectStatus?.type === 'loading'}
-                    className="flex-1 py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-all"
-                    style={{
-                      backgroundColor: 'var(--color-primary)',
-                      color: 'var(--color-background)',
-                      borderRadius: 'var(--border-radius)',
-                      opacity: !connectAddress.trim() ? 0.5 : 1,
-                    }}
-                  >
-                    <Wifi size={18} />
-                    Verifica e connetti
-                  </button>
+                  {connectStatus?.type !== 'success' ? (
+                    <button
+                      onClick={testConnection}
+                      disabled={!connectAddress.trim() || connectStatus?.type === 'loading'}
+                      className="flex-1 py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-all"
+                      style={{
+                        backgroundColor: 'var(--color-primary)',
+                        color: 'var(--color-background)',
+                        borderRadius: 'var(--border-radius)',
+                        opacity: !connectAddress.trim() ? 0.5 : 1,
+                      }}
+                    >
+                      <Wifi size={18} />
+                      Verifica e connetti
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        localStorage.setItem('forum_setup_done', 'connect');
+                        localStorage.setItem('forum_remote_address', connectAddress);
+                        localStorage.setItem('forum_remote_network', connectNetwork);
+                        window.location.href = '/identity';
+                      }}
+                      className="flex-1 py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-all"
+                      style={{
+                        backgroundColor: 'var(--color-success)',
+                        color: 'var(--color-background)',
+                        borderRadius: 'var(--border-radius)',
+                      }}
+                    >
+                      <ArrowRight size={18} />
+                      Continua — Crea la tua identita
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

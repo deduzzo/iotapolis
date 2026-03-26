@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import Sidebar from './Sidebar';
 import IdentityBadge from './IdentityBadge';
+import OnboardingGuard from './OnboardingGuard';
 import Toast from './Toast';
 import { useTheme } from '../hooks/useTheme';
 import { useIdentity } from '../hooks/useIdentity';
@@ -81,7 +82,8 @@ export default function Layout() {
     }
   }
 
-  const isSynced = syncStatus?.synced ?? null;
+  const syncState = syncStatus?.sync?.status || null;
+  const isSynced = syncState === 'idle' && syncStatus?.sync?.lastSync;
 
   return (
     <ToastContext.Provider value={{ addToast }}>
@@ -163,21 +165,23 @@ export default function Layout() {
 
             {/* Sync status */}
             <div className="flex items-center gap-2 shrink-0">
-              {isSynced !== null && (
+              {syncState && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg"
                   style={{
-                    color: isSynced ? 'var(--color-success)' : 'var(--color-warning)',
-                    background: isSynced
-                      ? 'rgba(0,255,136,0.1)'
+                    color: isSynced ? 'var(--color-success)'
+                      : syncState === 'error' ? 'var(--color-danger)'
+                      : 'var(--color-warning)',
+                    background: isSynced ? 'rgba(0,255,136,0.1)'
+                      : syncState === 'error' ? 'rgba(255,68,68,0.1)'
                       : 'rgba(255,170,0,0.1)',
                   }}
                 >
                   {isSynced ? <Wifi size={14} /> : <WifiOff size={14} />}
                   <span className="hidden sm:inline">
-                    {isSynced ? 'Synced' : 'Syncing...'}
+                    {isSynced ? 'Synced' : syncState === 'syncing' ? 'Syncing...' : syncState === 'error' ? 'Error' : 'Idle'}
                   </span>
                 </motion.div>
               )}
@@ -200,7 +204,9 @@ export default function Layout() {
 
           {/* Page content */}
           <main className="flex-1 p-4 md:p-6">
-            <Outlet />
+            <OnboardingGuard>
+              <Outlet />
+            </OnboardingGuard>
           </main>
         </div>
 
