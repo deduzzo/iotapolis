@@ -47,7 +47,7 @@ function ActionCard({ icon: Icon, title, description, buttonText, buttonColor, o
 
 export default function Settings() {
   const { identity, clearIdentity, exportIdentity } = useIdentity();
-  const addToast = useToast();
+  const { addToast } = useToast();
   const [loading, setLoading] = useState({});
   const [confirmReset, setConfirmReset] = useState(null);
   const [doubleConfirm, setDoubleConfirm] = useState(false);

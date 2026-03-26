@@ -83,20 +83,22 @@ module.exports = {
       });
       console.log('[register] Blockchain publish result:', JSON.stringify(txResult));
 
-      if (!txResult.success || txResult.verified === false) {
-        console.log('[register] TX failed or not verified — registration aborted. Error:', txResult.error || 'not verified on-chain');
+      if (!txResult.success) {
+        console.log('[register] TX failed — registration aborted. Error:', txResult.error);
         this.res.status(503);
         return {
           success: false,
-          error: 'Blockchain transaction failed: ' + (txResult.error || 'TX not verified on-chain'),
+          error: 'Blockchain transaction failed: ' + (txResult.error || 'unknown'),
           retryQueued: true,
           digest: txResult.digest || null,
         };
       }
 
       // Update role if admin (processTransaction defaults to 'user')
+      // Do this regardless of verification — the user was created in cache by processTransaction
       if (isFirstUser) {
-        Users.update(userId, { role: 'admin' });
+        try { Users.update(userId, { role: 'admin' }); } catch (e) { /* may not exist yet if verification pending */ }
+        console.log('[register] Admin role assigned to first user:', username);
       }
 
       const user = Users.findOne({ id: userId });

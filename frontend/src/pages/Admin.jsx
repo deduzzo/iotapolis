@@ -80,7 +80,7 @@ export default function Admin() {
 
 function CategoriesTab() {
   const { identity, signAndSend } = useIdentity();
-  const addToast = useToast();
+  const { addToast } = useToast();
   const { data, loading, error, reload } = useApi(
     () => api.getCategories(),
     [],
