@@ -149,7 +149,7 @@ echo -e "\n${YELLOW}[7/7] Creating GitHub Release...${NC}"
 
 # Collect and rename release artifacts (spaces → hyphens to match latest-mac.yml)
 ARTIFACTS=()
-for f in desktop/dist/*"${NEW_VERSION}"*.dmg desktop/dist/*"${NEW_VERSION}"*.exe desktop/dist/*"${NEW_VERSION}"*.AppImage desktop/dist/latest*.yml; do
+for f in desktop/dist/*"${NEW_VERSION}"*.dmg desktop/dist/*"${NEW_VERSION}"*.zip desktop/dist/*"${NEW_VERSION}"*.exe desktop/dist/*"${NEW_VERSION}"*.AppImage desktop/dist/latest*.yml; do
   if [ -f "$f" ]; then
     # Rename spaces to hyphens so GitHub URL matches latest-mac.yml
     newname=$(echo "$f" | sed 's/ /-/g')
