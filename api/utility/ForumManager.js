@@ -617,7 +617,12 @@ class ForumManager {
    */
   handleForumVote(data) {
     // Generate id if missing (old votes before fix didn't include id)
+    if (!data.postId || !data.authorId) {
+      sails.log.warn(`[ForumManager] Vote missing postId or authorId:`, JSON.stringify(data).substring(0, 200));
+      return;
+    }
     const voteId = data.id || `VOTE_${data.postId}_${data.authorId}`;
+    sails.log.verbose(`[ForumManager] handleForumVote: id=${voteId} postId=${data.postId} vote=${data.vote}`);
 
     const existing = Vote.findOne({ id: voteId });
 

@@ -96,6 +96,7 @@ function initDb() {
       authorId TEXT NOT NULL,
       vote INTEGER NOT NULL,
       createdAt INTEGER,
+      updatedAt INTEGER,
       UNIQUE(postId, authorId)
     );
 
@@ -151,6 +152,16 @@ function initDb() {
     CREATE INDEX IF NOT EXISTS idx_posts_thread ON posts(threadId);
     CREATE INDEX IF NOT EXISTS idx_votes_post ON votes(postId);
     CREATE INDEX IF NOT EXISTS idx_roles_target ON roles(targetUserId);
+  `);
+
+  // Migration: add updatedAt to votes if missing
+  try {
+    database.exec(`ALTER TABLE votes ADD COLUMN updatedAt INTEGER`);
+  } catch (e) {
+    // Column already exists — ignore
+  }
+
+  database.exec(`
     CREATE INDEX IF NOT EXISTS idx_moderations_post ON moderations(postId);
   `);
 
