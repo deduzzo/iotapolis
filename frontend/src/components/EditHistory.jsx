@@ -20,7 +20,7 @@ export default function EditHistory({ entityType, entityId, isOpen, onClose }) {
 
   const { data, loading, error } = useApi(fetcher, [entityType, entityId]);
 
-  const versions = Array.isArray(data) ? data : data?.versions || [];
+  const versions = Array.isArray(data) ? data : data?.history || data?.versions || [];
   // Most recent first
   const sorted = [...versions].sort(
     (a, b) => (b.version ?? 0) - (a.version ?? 0),
@@ -59,7 +59,7 @@ export default function EditHistory({ entityType, entityId, isOpen, onClose }) {
                 borderColor: 'var(--color-border)',
               }}
             >
-              <div className="flex items-center gap-3 mb-2">
+              <div className="flex items-center gap-3 mb-2 flex-wrap">
                 <span
                   className="text-xs font-bold px-2 py-0.5 rounded-full"
                   style={{
@@ -75,14 +75,19 @@ export default function EditHistory({ entityType, entityId, isOpen, onClose }) {
                   style={{ color: 'var(--color-text-muted)' }}
                 >
                   <Clock size={12} />
-                  {formatDate(ver.createdAt || ver.updatedAt)}
+                  {formatDate(ver.timestamp || ver.data?.createdAt || ver.createdAt)}
                 </span>
+                {ver.digest && (
+                  <span className="text-[10px] font-mono" style={{ color: 'var(--color-text-muted)' }}>
+                    TX: {ver.digest.slice(0, 12)}...
+                  </span>
+                )}
               </div>
               <p
                 className="text-sm line-clamp-4 whitespace-pre-wrap"
                 style={{ color: 'var(--color-text)' }}
               >
-                {ver.content || ver.title || '(empty)'}
+                {ver.data?.content || ver.content || ver.data?.title || ver.title || '(empty)'}
               </p>
             </motion.div>
           ))}
