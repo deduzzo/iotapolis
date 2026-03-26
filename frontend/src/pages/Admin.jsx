@@ -2,12 +2,13 @@ import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Shield, Folder, Users, Flag,
-  Plus, Edit3, Save, X, Search, Trash2,
+  Plus, Edit3, Save, X, Search, Trash2, EyeOff, Eye,
 } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { api } from '../api/endpoints';
 import { useIdentity } from '../hooks/useIdentity';
 import { useToast } from '../components/Layout';
+import BlockchainInfo from '../components/BlockchainInfo';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const tabs = [
@@ -107,6 +108,27 @@ function CategoriesTab() {
     setName(cat.name);
     setDescription(cat.description || '');
     setShowForm(true);
+  }
+
+  async function toggleHide(cat) {
+    if (!identity) return;
+    try {
+      const action = cat.hidden ? 'unhide' : 'hide';
+      const res = await signAndSend('/api/v1/moderate', 'POST', {
+        postId: cat.id,
+        action,
+        reason: action === 'hide' ? 'Admin nasconde categoria' : 'Admin ripristina categoria',
+      });
+      if (res.ok) {
+        addToast(action === 'hide' ? 'Categoria nascosta' : 'Categoria ripristinata', 'success');
+        reload();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        addToast('Errore: ' + (d.error || res.statusText), 'error');
+      }
+    } catch (err) {
+      addToast('Errore: ' + err.message, 'error');
+    }
   }
 
   async function handleSubmit(e) {
@@ -225,22 +247,48 @@ function CategoriesTab() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="glass-card flex items-center justify-between"
+          style={{ opacity: cat.hidden ? 0.5 : 1 }}
         >
-          <div>
-            <h3 className="font-semibold text-sm">{cat.name}</h3>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-sm">{cat.name}</h3>
+              {cat.hidden && (
+                <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(255,68,68,0.15)', color: 'var(--color-danger)' }}>
+                  nascosta
+                </span>
+              )}
+              <span className="text-xs font-mono" style={{ color: 'var(--color-text-muted)' }}>
+                {cat.id}
+              </span>
+            </div>
             {cat.description && (
               <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                 {cat.description}
               </p>
             )}
+            <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+              {cat.threadCount || 0} thread · {cat.postCount || 0} post
+            </p>
           </div>
-          <button
-            onClick={() => startEdit(cat)}
-            className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-            style={{ color: 'var(--color-text-muted)' }}
-          >
-            <Edit3 size={16} />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <BlockchainInfo entityType="category" entityId={cat.id} />
+            <button
+              onClick={() => startEdit(cat)}
+              className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+              style={{ color: 'var(--color-text-muted)' }}
+              title="Modifica"
+            >
+              <Edit3 size={14} />
+            </button>
+            <button
+              onClick={() => toggleHide(cat)}
+              className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+              style={{ color: cat.hidden ? 'var(--color-success)' : 'var(--color-danger)' }}
+              title={cat.hidden ? 'Ripristina' : 'Nascondi'}
+            >
+              {cat.hidden ? <Eye size={14} /> : <EyeOff size={14} />}
+            </button>
+          </div>
         </motion.div>
       ))}
     </div>

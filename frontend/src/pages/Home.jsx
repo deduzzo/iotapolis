@@ -4,6 +4,7 @@ import { Folder, MessageSquare, FileText, Clock, Plus } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { useIdentity } from '../hooks/useIdentity';
 import { api } from '../api/endpoints';
+import BlockchainInfo from '../components/BlockchainInfo';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const container = {
@@ -134,7 +135,7 @@ export default function Home() {
                 </div>
 
                 <div
-                  className="flex flex-wrap gap-4 text-xs"
+                  className="flex flex-wrap items-center gap-4 text-xs"
                   style={{ color: 'var(--color-text-muted)' }}
                 >
                   <span className="flex items-center gap-1">
@@ -148,6 +149,9 @@ export default function Home() {
                   <span className="flex items-center gap-1">
                     <Clock size={12} />
                     {formatTime(cat.lastActivity)}
+                  </span>
+                  <span onClick={e => e.preventDefault()}>
+                    <BlockchainInfo entityType="category" entityId={cat.id} />
                   </span>
                 </div>
               </motion.div>
