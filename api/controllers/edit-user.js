@@ -11,7 +11,7 @@ module.exports = {
     showUsername: { type: 'boolean' },
     authorId: { type: 'string' },
     nonce: { type: 'string', required: true },
-    version: { type: 'number', required: true },
+    version: { type: 'number' },
     createdAt: { type: 'number', required: true },
     publicKey: { type: 'string', required: true },
     signature: { type: 'string', required: true },
@@ -44,6 +44,7 @@ module.exports = {
       // Publish to blockchain (processTransaction handles cache)
       const ForumManager = require('../utility/ForumManager');
       const txResult = await ForumManager.publishToChain(ForumTags.FORUM_USER, userId, {
+        id: userId,
         username: user.username,
         bio: inputs.bio !== undefined ? inputs.bio : user.bio,
         avatar: inputs.avatar !== undefined ? inputs.avatar : user.avatar,
