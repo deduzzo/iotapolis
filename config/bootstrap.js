@@ -135,27 +135,30 @@ module.exports.bootstrap = async function (done) {
         console.log('[bootstrap] Blockchain sync completed successfully');
         log.info('[bootstrap] Blockchain sync completed');
 
-        // Try real-time subscription first, fall back to polling
+        // Try real-time subscription with timeout, fall back to polling
+        let subscribed = false;
         try {
-          const subscribed = await ForumManager.startRealtimeSubscription();
+          const subPromise = ForumManager.startRealtimeSubscription();
+          const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Subscription timeout (10s)')), 10000));
+          subscribed = await Promise.race([subPromise, timeout]);
           if (subscribed) {
             console.log('[bootstrap] Real-time blockchain subscription active');
-          } else {
-            throw new Error('Subscription returned false');
           }
         } catch (subErr) {
-          console.log('[bootstrap] RT subscription failed, starting polling fallback (30s):', subErr.message);
-          try {
-            await ForumManager.initEventCursor();
-            setInterval(() => {
-              ForumManager.pollNewEvents().catch(err => {
-                sails.log.warn('[poll] Error:', err.message);
-              });
-            }, 30000);
-            console.log('[bootstrap] Blockchain polling started (30s interval)');
-          } catch (cursorErr) {
-            console.log('[bootstrap] Event cursor init failed:', cursorErr.message);
-          }
+          console.log('[bootstrap] RT subscription failed:', subErr.message);
+        }
+
+        // Always start polling as fallback/complement (30s)
+        try {
+          await ForumManager.initEventCursor();
+          setInterval(() => {
+            ForumManager.pollNewEvents().catch(err => {
+              sails.log.warn('[poll] Error:', err.message);
+            });
+          }, 30000);
+          console.log('[bootstrap] Blockchain polling started (30s interval)');
+        } catch (cursorErr) {
+          console.log('[bootstrap] Event cursor init failed:', cursorErr.message);
         }
       }).catch((err) => {
         console.log('[bootstrap] Blockchain sync failed:', err.message);
