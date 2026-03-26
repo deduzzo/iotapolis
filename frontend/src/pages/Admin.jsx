@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield, Folder, Users, Flag,
-  Plus, Edit3, Save, X, Search, Trash2, EyeOff, Eye,
+  Plus, Edit3, Save, X, Search, Trash2, EyeOff, Eye, AlertTriangle, Loader2,
 } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { api } from '../api/endpoints';
@@ -93,6 +93,8 @@ function CategoriesTab() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null); // { cat, action }
+  const [actionLoading, setActionLoading] = useState(false);
 
   const categories = Array.isArray(data) ? data : data?.categories || data?.data || [];
 
@@ -110,24 +112,33 @@ function CategoriesTab() {
     setShowForm(true);
   }
 
-  async function toggleHide(cat) {
-    if (!identity) return;
+  async function executeAction() {
+    if (!confirmAction || !identity) return;
+    const { cat, action } = confirmAction;
+    setActionLoading(true);
     try {
-      const action = cat.hidden ? 'unhide' : 'hide';
       const res = await signAndSend('/api/v1/moderate', 'POST', {
         postId: cat.id,
         action,
         reason: action === 'hide' ? 'Admin nasconde categoria' : 'Admin ripristina categoria',
       });
-      if (res.ok) {
-        addToast(action === 'hide' ? 'Categoria nascosta' : 'Categoria ripristinata', 'success');
+      const d = await res.json().catch(() => ({}));
+      if (res.ok && d.success) {
+        addToast(
+          action === 'hide'
+            ? `Categoria "${cat.name}" nascosta — TX: ${d.digest?.substring(0, 12) || 'ok'}...`
+            : `Categoria "${cat.name}" ripristinata — TX: ${d.digest?.substring(0, 12) || 'ok'}...`,
+          'success'
+        );
         reload();
       } else {
-        const d = await res.json().catch(() => ({}));
         addToast('Errore: ' + (d.error || res.statusText), 'error');
       }
     } catch (err) {
       addToast('Errore: ' + err.message, 'error');
+    } finally {
+      setActionLoading(false);
+      setConfirmAction(null);
     }
   }
 
@@ -281,7 +292,7 @@ function CategoriesTab() {
               <Edit3 size={14} />
             </button>
             <button
-              onClick={() => toggleHide(cat)}
+              onClick={() => setConfirmAction({ cat, action: cat.hidden ? 'unhide' : 'hide' })}
               className="p-2 rounded-lg hover:bg-white/10 transition-colors"
               style={{ color: cat.hidden ? 'var(--color-success)' : 'var(--color-danger)' }}
               title={cat.hidden ? 'Ripristina' : 'Nascondi'}
@@ -291,6 +302,75 @@ function CategoriesTab() {
           </div>
         </motion.div>
       ))}
+
+      {/* Confirm action modal */}
+      <AnimatePresence>
+        {confirmAction && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="absolute inset-0 bg-black/60" onClick={actionLoading ? undefined : () => setConfirmAction(null)} />
+            <motion.div
+              className="glass-card relative p-6 rounded-xl max-w-md mx-4"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              style={{ borderRadius: 'var(--border-radius)' }}
+            >
+              {actionLoading ? (
+                <div className="text-center py-4">
+                  <Loader2 size={36} className="animate-spin mx-auto mb-3" style={{ color: 'var(--color-primary)' }} />
+                  <h3 className="text-lg font-bold mb-1">Transazione in corso...</h3>
+                  <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                    Pubblicazione sulla blockchain IOTA e verifica. Non chiudere.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3 mb-4">
+                    <AlertTriangle size={24} style={{ color: confirmAction.action === 'hide' ? 'var(--color-danger)' : 'var(--color-success)' }} />
+                    <h3 className="text-lg font-bold">
+                      {confirmAction.action === 'hide' ? 'Nascondi categoria' : 'Ripristina categoria'}
+                    </h3>
+                  </div>
+                  <p className="mb-2" style={{ color: 'var(--color-text-muted)' }}>
+                    {confirmAction.action === 'hide'
+                      ? <>Vuoi nascondere la categoria <strong style={{ color: 'var(--color-text)' }}>"{confirmAction.cat.name}"</strong>? Non sara piu visibile agli utenti.</>
+                      : <>Vuoi ripristinare la categoria <strong style={{ color: 'var(--color-text)' }}>"{confirmAction.cat.name}"</strong>? Tornera visibile a tutti.</>
+                    }
+                  </p>
+                  <p className="mb-4 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                    Questa azione verra registrata sulla blockchain come transazione firmata e verificabile.
+                  </p>
+                  <div className="flex justify-end gap-3">
+                    <button
+                      onClick={() => setConfirmAction(null)}
+                      className="px-4 py-2 rounded-lg text-sm"
+                      style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', borderRadius: 'var(--border-radius)' }}
+                    >
+                      Annulla
+                    </button>
+                    <button
+                      onClick={executeAction}
+                      className="px-4 py-2 rounded-lg text-sm font-medium"
+                      style={{
+                        backgroundColor: confirmAction.action === 'hide' ? 'var(--color-danger)' : 'var(--color-success)',
+                        color: '#fff',
+                        borderRadius: 'var(--border-radius)',
+                      }}
+                    >
+                      {confirmAction.action === 'hide' ? 'Nascondi' : 'Ripristina'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
