@@ -76,6 +76,15 @@ function applyThemeToRoot(theme) {
   root.style.setProperty('--glassmorphism', effects.glassmorphism ? '1' : '0');
   root.style.setProperty('--neon-glow', effects.neonGlow ? '1' : '0');
 
+  // Set --shadow-card based on theme properties
+  if (effects.glassmorphism) {
+    root.style.setProperty('--shadow-card', 'none');
+  } else if (theme.category === 'light') {
+    root.style.setProperty('--shadow-card', '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)');
+  } else {
+    root.style.setProperty('--shadow-card', '0 2px 8px rgba(0,0,0,0.3)');
+  }
+
   // Load required fonts
   loadFont(typography.fontFamily);
   if (typography.headingFamily !== typography.fontFamily) {
@@ -83,23 +92,38 @@ function applyThemeToRoot(theme) {
   }
 }
 
+const USER_THEME_KEY = 'forum_user_theme';
+
 export function ThemeProvider({ children }) {
-  const [activeThemeId, setActiveThemeId] = useState('neon-cyber');
+  const [forumThemeId, setForumThemeId] = useState('neon-cyber');
+  const [userThemeId, setUserThemeId] = useState(null); // localStorage override
   const [overrides, setOverrides] = useState({});
   const [forumName, setForumName] = useState('IOTA Free Forum');
   const [logoBase64, setLogoBase64] = useState(null);
+
+  // Active theme: user override > forum default
+  const activeThemeId = userThemeId || forumThemeId;
 
   const activeTheme = useMemo(
     () => themes.find((t) => t.id === activeThemeId) || themes[0],
     [activeThemeId],
   );
 
+  // When user picks a personal theme, don't apply admin overrides
   const resolvedTheme = useMemo(
-    () => resolveTheme(activeTheme, overrides),
-    [activeTheme, overrides],
+    () => userThemeId ? activeTheme : resolveTheme(activeTheme, overrides),
+    [activeTheme, overrides, userThemeId],
   );
 
-  // Fetch saved theme config on mount
+  // Load user theme preference from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(USER_THEME_KEY);
+    if (saved && themes.some((t) => t.id === saved)) {
+      setUserThemeId(saved);
+    }
+  }, []);
+
+  // Fetch saved forum theme config on mount
   useEffect(() => {
     (async () => {
       try {
@@ -107,7 +131,7 @@ export function ThemeProvider({ children }) {
         if (!res.ok) throw new Error('No saved theme');
         const config = await res.json();
         if (config.themeId && themes.some((t) => t.id === config.themeId)) {
-          setActiveThemeId(config.themeId);
+          setForumThemeId(config.themeId);
         }
         if (config.overrides) setOverrides(config.overrides);
         if (config.forumName) setForumName(config.forumName);
@@ -123,8 +147,20 @@ export function ThemeProvider({ children }) {
     applyThemeToRoot(resolvedTheme);
   }, [resolvedTheme]);
 
+  // Admin sets the forum-wide default theme
   const setBaseTheme = useCallback((themeId) => {
-    setActiveThemeId(themeId);
+    setForumThemeId(themeId);
+  }, []);
+
+  // User sets their personal theme override (saved in localStorage)
+  const setUserTheme = useCallback((themeId) => {
+    if (themeId) {
+      localStorage.setItem(USER_THEME_KEY, themeId);
+      setUserThemeId(themeId);
+    } else {
+      localStorage.removeItem(USER_THEME_KEY);
+      setUserThemeId(null);
+    }
   }, []);
 
   const saveTheme = useCallback(async () => {
@@ -159,17 +195,20 @@ export function ThemeProvider({ children }) {
     () => ({
       theme: resolvedTheme,
       activeThemeId,
+      userThemeId,
+      forumThemeId,
       overrides,
       forumName,
       logoBase64,
       setBaseTheme,
+      setUserTheme,
       setOverrides,
       setForumName,
       setLogoBase64,
       saveTheme,
       resetToDefault,
     }),
-    [resolvedTheme, activeThemeId, overrides, forumName, logoBase64, setBaseTheme, setOverrides, setForumName, setLogoBase64, saveTheme, resetToDefault],
+    [resolvedTheme, activeThemeId, userThemeId, forumThemeId, overrides, forumName, logoBase64, setBaseTheme, setUserTheme, setOverrides, setForumName, setLogoBase64, saveTheme, resetToDefault],
   );
 
   return (

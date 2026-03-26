@@ -8,7 +8,7 @@ import { api } from '../api/endpoints';
 import { useIdentity } from '../hooks/useIdentity';
 import PostCard from '../components/PostCard';
 import NestedReplies from '../components/NestedReplies';
-import MarkdownEditor from '../components/MarkdownEditor';
+import RichEditor from '../components/RichEditor';
 import MarkdownRender from '../components/MarkdownRender';
 import VoteButtons from '../components/VoteButtons';
 import IdentityBadge from '../components/IdentityBadge';
@@ -409,10 +409,10 @@ export default function Thread() {
           >
             Post a Reply
           </h3>
-          <MarkdownEditor
+          <RichEditor
             value={replyContent}
             onChange={setReplyContent}
-            placeholder="Write your reply..."
+            placeholder="Scrivi la tua risposta..."
           />
           <div className="flex justify-end mt-3">
             <motion.button

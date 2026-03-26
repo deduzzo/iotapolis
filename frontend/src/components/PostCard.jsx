@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { MessageSquare, Edit3, Clock } from 'lucide-react';
 import IdentityBadge from './IdentityBadge';
 import MarkdownRender from './MarkdownRender';
-import MarkdownEditor from './MarkdownEditor';
+import RichEditor from './RichEditor';
 import VoteButtons from './VoteButtons';
 
 function formatDate(dateStr) {
@@ -131,10 +131,11 @@ export default function PostCard({
               className="mt-3 pt-3 border-t"
               style={{ borderColor: 'var(--color-border)' }}
             >
-              <MarkdownEditor
+              <RichEditor
                 value={replyContent}
                 onChange={setReplyContent}
-                placeholder="Write your reply..."
+                placeholder="Scrivi la tua risposta..."
+                minHeight="80px"
               />
               <div className="flex items-center gap-2 mt-2 justify-end">
                 <button

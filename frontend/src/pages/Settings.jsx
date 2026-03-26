@@ -7,6 +7,9 @@ import {
 } from 'lucide-react';
 import { useIdentity } from '../hooks/useIdentity';
 import { useToast } from '../components/Layout';
+import { useTheme } from '../hooks/useTheme';
+import { themes } from '../data/themes';
+import { Palette, Check } from 'lucide-react';
 
 function ActionCard({ icon: Icon, title, description, buttonText, buttonColor, onAction, loading, danger }) {
   return (
@@ -54,6 +57,8 @@ export default function Settings() {
   const [doubleConfirm, setDoubleConfirm] = useState(false);
   const [logs, setLogs] = useState([]);
   const [forumInfo, setForumInfo] = useState(null);
+
+  const { activeThemeId, userThemeId, setUserTheme } = useTheme();
 
   useEffect(() => {
     fetch('/api/v1/forum-info').then(r => r.json()).then(setForumInfo).catch(() => {});
@@ -186,6 +191,86 @@ export default function Settings() {
           Strumenti di gestione e debug per il forum
         </p>
       </div>
+
+      {/* Tema personale */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass-card p-6 rounded-xl"
+        style={{ borderRadius: 'var(--border-radius)' }}
+      >
+        <h2 className="text-lg font-semibold mb-2 flex items-center gap-2">
+          <Palette size={20} style={{ color: 'var(--color-primary)' }} />
+          Tema
+        </h2>
+        <p className="text-sm mb-4" style={{ color: 'var(--color-text-muted)' }}>
+          Scegli il tema del forum. La tua scelta sovrascrive il tema predefinito impostato dall'admin.
+        </p>
+
+        {/* "Usa default" option */}
+        <button
+          onClick={() => setUserTheme(null)}
+          className="w-full mb-3 p-3 rounded-xl border text-sm text-left flex items-center justify-between transition-colors"
+          style={{
+            borderColor: !userThemeId ? 'var(--color-primary)' : 'var(--color-border)',
+            background: !userThemeId ? 'rgba(0,240,255,0.06)' : 'transparent',
+            color: 'var(--color-text)',
+          }}
+        >
+          <span>Usa tema predefinito del forum</span>
+          {!userThemeId && <Check size={16} style={{ color: 'var(--color-primary)' }} />}
+        </button>
+
+        {/* Theme grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {themes.map((t) => {
+            const isSelected = activeThemeId === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setUserTheme(t.id)}
+                className="p-3 rounded-xl border text-left transition-all"
+                style={{
+                  borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
+                  background: isSelected ? 'rgba(0,240,255,0.06)' : 'var(--color-surface)',
+                  boxShadow: isSelected ? `0 0 12px rgba(0,240,255,0.15)` : 'none',
+                }}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
+                    {t.name}
+                  </span>
+                  <span
+                    className="text-[10px] px-1.5 py-0.5 rounded-full"
+                    style={{
+                      background: t.category === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                      color: 'var(--color-text-muted)',
+                    }}
+                  >
+                    {t.category === 'dark' ? 'Dark' : 'Light'}
+                  </span>
+                </div>
+                {/* Color preview dots */}
+                <div className="flex gap-1.5">
+                  {[t.base.background, t.base.surface, t.accent.primary, t.accent.secondary, t.accent.success].map((c, i) => (
+                    <div
+                      key={i}
+                      className="w-5 h-5 rounded-full border"
+                      style={{ background: c, borderColor: 'rgba(128,128,128,0.3)' }}
+                    />
+                  ))}
+                </div>
+                {isSelected && (
+                  <div className="mt-2 flex items-center gap-1">
+                    <Check size={12} style={{ color: 'var(--color-primary)' }} />
+                    <span className="text-xs" style={{ color: 'var(--color-primary)' }}>Attivo</span>
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </motion.div>
 
       {/* Stato corrente */}
       <div className="glass-card p-6 rounded-xl" style={{ borderRadius: 'var(--border-radius)' }}>

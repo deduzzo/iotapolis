@@ -18,6 +18,7 @@
   --border-radius: 12px;
   --glassmorphism: 1;
   --neon-glow: 1;
+  --shadow-card: none;
 }
 
 body {
@@ -82,6 +83,7 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid rgba(255, 255, 255, calc(var(--glassmorphism) * 0.1));
   border-radius: var(--border-radius);
   padding: 1.5rem;
+  box-shadow: var(--shadow-card);
 }
 
 /* Glass static (no padding, used as wrapper) */
@@ -122,4 +124,158 @@ h1, h2, h3, h4, h5, h6 {
 /* Override transitions for elements that should not animate */
 input, textarea, button, a {
   transition-duration: 0.15s;
+}
+
+/* ── Rich Editor (Tiptap) ─────────────────────────────────────────── */
+
+.rich-editor-content {
+  font-family: var(--font-family);
+  font-size: 0.9375rem;
+  line-height: 1.7;
+}
+
+.rich-editor-content p {
+  margin: 0.4em 0;
+}
+
+.rich-editor-content h1, .rich-editor-content h2, .rich-editor-content h3 {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  margin: 0.8em 0 0.4em;
+}
+
+.rich-editor-content h1 { font-size: 1.5em; }
+.rich-editor-content h2 { font-size: 1.25em; }
+.rich-editor-content h3 { font-size: 1.1em; }
+
+.rich-editor-content a,
+.rich-editor-content .editor-link {
+  color: var(--color-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.rich-editor-content blockquote {
+  border-left: 3px solid var(--color-primary);
+  padding-left: 1em;
+  margin: 0.6em 0;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.rich-editor-content code {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.rich-editor-content pre {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.75em 1em;
+  overflow-x: auto;
+  margin: 0.6em 0;
+}
+
+.rich-editor-content pre code {
+  background: none;
+  padding: 0;
+  color: var(--color-text);
+}
+
+.rich-editor-content ul { list-style: disc; padding-left: 1.5em; margin: 0.4em 0; }
+.rich-editor-content ol { list-style: decimal; padding-left: 1.5em; margin: 0.4em 0; }
+.rich-editor-content li { margin: 0.15em 0; }
+
+/* Task list (checklist) */
+.rich-editor-content ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.rich-editor-content ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+}
+
+.rich-editor-content ul[data-type="taskList"] li > label {
+  margin-top: 0.15em;
+}
+
+.rich-editor-content ul[data-type="taskList"] li > label input[type="checkbox"] {
+  accent-color: var(--color-primary);
+  width: 16px;
+  height: 16px;
+}
+
+/* Table */
+.rich-editor-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.6em 0;
+}
+
+.rich-editor-content th,
+.rich-editor-content td {
+  border: 1px solid var(--color-border);
+  padding: 0.4em 0.75em;
+  text-align: left;
+}
+
+.rich-editor-content th {
+  background: var(--color-surface);
+  font-weight: 600;
+}
+
+/* Mention */
+.rich-editor-content .mention {
+  background: rgba(0, 240, 255, 0.12);
+  color: var(--color-primary);
+  border-radius: 4px;
+  padding: 0.1em 0.3em;
+  font-weight: 500;
+}
+
+/* Image */
+.rich-editor-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 0.5em 0;
+}
+
+/* Horizontal rule */
+.rich-editor-content hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 1em 0;
+}
+
+/* Placeholder */
+.rich-editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--color-text-muted);
+  pointer-events: none;
+  height: 0;
+}
+
+/* Non-glass card fallback: solid surface when glassmorphism is off */
+@supports (backdrop-filter: blur(1px)) {
+  .glass-card {
+    background: rgba(255, 255, 255, calc(var(--glassmorphism) * 0.05));
+  }
+}
+
+/* When glassmorphism is 0, override with solid bg */
+@media all {
+  .glass-card-solid {
+    background: var(--color-surface);
+    box-shadow: var(--shadow-card);
+  }
 }

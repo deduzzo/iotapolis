@@ -119,6 +119,96 @@ export const themes = [
       animations: true,
     },
   },
+  {
+    id: 'invision-light',
+    name: 'Invision Light',
+    category: 'light',
+    base: {
+      background: '#f5f5f5',
+      surface: '#ffffff',
+      surfaceHover: '#f0f2f5',
+      border: '#e0e0e0',
+      text: '#1a1a2e',
+      textMuted: '#6b7280',
+    },
+    accent: {
+      primary: '#2D6CDF',
+      secondary: '#5B8DEF',
+      success: '#2ecc71',
+      warning: '#f39c12',
+      danger: '#e74c3c',
+    },
+    typography: {
+      fontFamily: 'Inter',
+      headingFamily: 'Inter',
+      borderRadius: '10px',
+    },
+    effects: {
+      glassmorphism: false,
+      neonGlow: false,
+      animations: true,
+    },
+  },
+  {
+    id: 'invision-dark',
+    name: 'Invision Dark',
+    category: 'dark',
+    base: {
+      background: '#1a1c23',
+      surface: '#22252d',
+      surfaceHover: '#2a2d37',
+      border: '#333844',
+      text: '#e4e6eb',
+      textMuted: '#8b8fa3',
+    },
+    accent: {
+      primary: '#4B8BF5',
+      secondary: '#6EA8FE',
+      success: '#2ecc71',
+      warning: '#f39c12',
+      danger: '#e74c3c',
+    },
+    typography: {
+      fontFamily: 'Inter',
+      headingFamily: 'Inter',
+      borderRadius: '10px',
+    },
+    effects: {
+      glassmorphism: false,
+      neonGlow: false,
+      animations: true,
+    },
+  },
+  {
+    id: 'material-ocean',
+    name: 'Material Ocean',
+    category: 'dark',
+    base: {
+      background: '#0F111A',
+      surface: '#1A1C25',
+      surfaceHover: '#232530',
+      border: '#2B2F3E',
+      text: '#D4D8E8',
+      textMuted: '#717CB4',
+    },
+    accent: {
+      primary: '#00BCD4',
+      secondary: '#26C6DA',
+      success: '#00E676',
+      warning: '#FFD740',
+      danger: '#FF5252',
+    },
+    typography: {
+      fontFamily: 'Inter',
+      headingFamily: 'Space Grotesk',
+      borderRadius: '12px',
+    },
+    effects: {
+      glassmorphism: false,
+      neonGlow: false,
+      animations: true,
+    },
+  },
 ];
 
 export const availableFonts = [

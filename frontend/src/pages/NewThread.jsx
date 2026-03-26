@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, Send, Lock } from 'lucide-react';
 import { useIdentity } from '../hooks/useIdentity';
-import MarkdownEditor from '../components/MarkdownEditor';
+import RichEditor from '../components/RichEditor';
 
 export default function NewThread() {
   const { id: categoryId } = useParams();
@@ -146,10 +146,11 @@ export default function NewThread() {
             >
               Content
             </label>
-            <MarkdownEditor
+            <RichEditor
               value={content}
               onChange={setContent}
-              placeholder="Write your thread content in markdown..."
+              placeholder="Scrivi il contenuto del thread..."
+              minHeight="200px"
             />
           </div>
 
