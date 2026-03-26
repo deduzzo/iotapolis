@@ -377,57 +377,42 @@ async function _mergeAllCoins() {
 // Il primo split ha amount = 1 (marker), il secondo = lunghezza payload.
 // I successivi contengono i chunks del payload codificati.
 
-// --- V2 Encoding: 1 byte per coin (low nanos, affordable on testnet) ---
-// Each byte of the payload is encoded as: (index * 256) + byte_value
-// This means each coin amount is at most (65535 * 256 + 255) = 16,777,215 nanos (~0.017 IOTA)
-// Total cost for 580 bytes: ~580 * 8388608 avg = ~4.8B nanos = ~5 IOTA (worst case)
+// --- V3 Encoding: 2 bytes per coin (half the coins of V2, affordable) ---
+// Each pair of bytes is encoded as: (chunkIndex * 65536) + (byte0 * 256) + byte1
+// Max value per coin: ~19M nanos (~0.019 IOTA) at max index
+// For 580 bytes: 290 coins, total ~2.8 IOTA — fits in a single TX under 512 limit
 //
-// V1 encoding (exart26 original) packed 6 bytes per coin as raw u64 values,
-// which required enormous balances (millions of IOTA). V2 is much cheaper.
-
-const CHUNK_DATA_SIZE = 6; // Still used by chain-linking size calculation
-const ENCODING_VERSION = 2; // Marker: 2 = V2 encoding (1 byte per coin)
+// Marker: 2 = v2/v3 encoding (distinguished by payload structure)
+const ENCODING_VERSION = 2;
 
 function _encodePayloadToChunks(payload) {
   const payloadBytes = Buffer.isBuffer(payload) ? payload : Buffer.from(payload, 'utf8');
   const chunks = [];
-  for (let i = 0; i < payloadBytes.length; i++) {
-    // Each byte: (index * 256) + byte_value
-    // Max index: 65535 (supports payloads up to 64KB before chain-linking)
-    // Max value per coin: 65535 * 256 + 255 = 16,777,215 nanos
-    const value = BigInt(i) * 256n + BigInt(payloadBytes[i]);
+  for (let i = 0; i < payloadBytes.length; i += 2) {
+    const chunkIdx = Math.floor(i / 2);
+    const b0 = payloadBytes[i];
+    const b1 = i + 1 < payloadBytes.length ? payloadBytes[i + 1] : 0;
+    // value = chunkIndex * 65536 + byte0 * 256 + byte1
+    const value = BigInt(chunkIdx) * 65536n + BigInt(b0) * 256n + BigInt(b1);
     chunks.push(value);
   }
   return { chunks, length: payloadBytes.length };
 }
 
 function _decodeChunksToBuffer(u64Values, payloadLength) {
-  // Detect encoding version from the marker
-  // V2: marker=2, amounts are (index*256 + byte)
-  // V1 (legacy): marker=1, amounts are 8-byte packed (2-byte index + 6-byte data)
   const result = Buffer.alloc(payloadLength);
 
-  // Try V2 decoding: each value = index*256 + byte
   for (const val of u64Values) {
     const v = BigInt(val);
-    const index = Number(v / 256n);
-    const byte = Number(v % 256n);
-    if (index < payloadLength) {
-      result[index] = byte;
-    }
+    const chunkIdx = Number(v / 65536n);
+    const remainder = Number(v % 65536n);
+    const b0 = (remainder >> 8) & 0xFF;
+    const b1 = remainder & 0xFF;
+    const offset = chunkIdx * 2;
+    if (offset < payloadLength) result[offset] = b0;
+    if (offset + 1 < payloadLength) result[offset + 1] = b1;
   }
   return result;
-}
-
-// Legacy V1 decoder (for reading old exart26 data)
-function _decodeChunksToBufferV1(u64Values, payloadLength) {
-  const buffers = u64Values.map(val => {
-    const hex = BigInt(val).toString(16).padStart(16, '0');
-    return Buffer.from(hex, 'hex');
-  });
-  buffers.sort((a, b) => ((a[0] << 8) | a[1]) - ((b[0] << 8) | b[1]));
-  const combined = Buffer.concat(buffers.map(b => b.subarray(2)));
-  return combined.subarray(0, payloadLength);
 }
 
 /**
@@ -474,9 +459,21 @@ async function publishData(tag, dataObject, entityId = null, version = null) {
       const config = _getConfig();
       const network = config.IOTA_NETWORK || 'testnet';
       if (network === 'testnet' || network === 'devnet') {
-        console.log(`[iota] Balance too low (${totalBalance} nanos). Requesting faucet...`);
-        try { await requestFaucet(); } catch (e) { /* */ }
-        await waitForFunds(15000);
+        console.log(`[iota] Balance too low (${totalBalance} nanos). Requesting faucet in loop...`);
+        // Request faucet multiple times until we have enough
+        for (let attempt = 0; attempt < 5; attempt++) {
+          try { await requestFaucet(); } catch (e) { /* rate limited */ }
+          await new Promise(r => setTimeout(r, 3000));
+          const funds = await waitForFunds(10000);
+          if (funds.ready) {
+            // Re-check balance
+            const bal = await client.getBalance({ owner: address });
+            if (BigInt(bal.totalBalance) >= minRequired) {
+              console.log(`[iota] Funded: ${bal.totalBalance} nanos after ${attempt + 1} faucet requests`);
+              break;
+            }
+          }
+        }
       } else {
         return { success: false, digest: null, error: `Insufficient balance: ${totalBalance} nanos. Minimum required: ${minRequired}. Please fund the wallet.` };
       }
@@ -526,12 +523,11 @@ async function _publishDataWithRetry(tag, dataObject, entityId = null, version =
   }
 }
 
-// V2 encoding: 1 byte per coin, max 500 per splitCoins batch (512 limit - margin)
-// With 2 batches and overhead (marker + length), max ~998 bytes per TX
-// For safety, keep single-TX limit at 490 bytes (one batch)
-const MAX_CHUNKS_PER_TX = 490;
+// V3 encoding: 2 bytes per coin → 500 coins = 1000 bytes per TX
+// With marker + length overhead, safe limit = 996 bytes per TX
+const MAX_CHUNKS_PER_TX = 498;
 // Max payload compresso per singola TX (chain-linking if larger)
-const MAX_PART_BYTES = MAX_CHUNKS_PER_TX;
+const MAX_PART_BYTES = MAX_CHUNKS_PER_TX * 2; // 996 bytes
 
 /**
  * Pubblica una singola TX on-chain (senza chain-linking).
