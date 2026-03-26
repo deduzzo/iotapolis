@@ -179,7 +179,7 @@ export default function Thread() {
             <div className="flex items-center gap-3 mb-4 flex-wrap">
               <IdentityBadge
                 userId={thread.authorId}
-                username={thread.authorName}
+                username={thread.authorUsername || thread.authorName}
                 size="sm"
               />
               <span

@@ -1,6 +1,7 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Folder, MessageSquare, FileText, Clock, Plus } from 'lucide-react';
+import { Folder, MessageSquare, FileText, Clock, Plus, Share2, Copy, CheckCircle } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { useIdentity } from '../hooks/useIdentity';
 import { api } from '../api/endpoints';
@@ -87,16 +88,55 @@ export default function Home() {
     );
   }
 
+  const [forumInfo, setForumInfo] = useState(null);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    fetch('/api/v1/forum-info').then(r => r.json()).then(d => setForumInfo(d)).catch(() => {});
+  }, []);
+
+  function copyConnectionString() {
+    if (forumInfo?.connectionString) {
+      navigator.clipboard.writeText(forumInfo.connectionString);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
   return (
     <div className="max-w-4xl mx-auto">
-      <motion.h1
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-2xl md:text-3xl font-bold mb-6 neon-text"
-        style={{ fontFamily: 'var(--font-heading)' }}
-      >
-        Categories
-      </motion.h1>
+      {/* Header with share button */}
+      <div className="flex items-center justify-between mb-6">
+        <motion.h1
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-2xl md:text-3xl font-bold neon-text"
+          style={{ fontFamily: 'var(--font-heading)' }}
+        >
+          Categories
+        </motion.h1>
+
+        {forumInfo?.connectionString && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={copyConnectionString}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+            style={{
+              backgroundColor: copied ? 'rgba(0,255,136,0.15)' : 'var(--color-surface)',
+              color: copied ? 'var(--color-success)' : 'var(--color-primary)',
+              border: '1px solid',
+              borderColor: copied ? 'var(--color-success)' : 'var(--color-border)',
+              borderRadius: 'var(--border-radius)',
+            }}
+            title={`Condividi: ${forumInfo.connectionString}`}
+          >
+            {copied ? <CheckCircle size={16} /> : <Share2 size={16} />}
+            <span className="hidden sm:inline">{copied ? 'Copiato!' : 'Condividi Forum'}</span>
+          </motion.button>
+        )}
+      </div>
 
       <motion.div
         variants={container}

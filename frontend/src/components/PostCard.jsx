@@ -68,7 +68,7 @@ export default function PostCard({
           <div className="flex items-center gap-3 mb-2 flex-wrap">
             <IdentityBadge
               userId={post.authorId}
-              username={post.authorName}
+              username={post.authorUsername || post.authorName}
               size="sm"
             />
             <span
