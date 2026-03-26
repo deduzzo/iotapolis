@@ -1,0 +1,79 @@
+{
+  "name": "iota-free-forum-desktop",
+  "version": "0.1.0",
+  "description": "IOTA Free Forum — Decentralized forum on IOTA 2.0 blockchain",
+  "main": "main.js",
+  "author": "deduzzo",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/deduzzo/iota-free-forum.git"
+  },
+  "build": {
+    "appId": "org.iotaforum.desktop",
+    "productName": "IOTA Free Forum",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "icons/**"
+    ],
+    "extraResources": [
+      {
+        "from": "../",
+        "to": "app-server",
+        "filter": [
+          "app.js",
+          "package.json",
+          "node_modules/**",
+          "api/**",
+          "config/**",
+          "move/**",
+          ".tmp/public/**",
+          "!**/node_modules/.cache/**",
+          "!**/.git/**"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.social-networking",
+      "target": [
+        { "target": "dmg", "arch": ["universal"] }
+      ],
+      "icon": "icons/icon.icns"
+    },
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "icon": "icons/icon.ico"
+    },
+    "linux": {
+      "target": [
+        { "target": "AppImage", "arch": ["x64"] }
+      ],
+      "icon": "icons/icon.png",
+      "category": "Network"
+    },
+    "nsis": {
+      "oneClick": true,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "deduzzo",
+      "repo": "iota-free-forum",
+      "releaseType": "release"
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}

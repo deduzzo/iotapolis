@@ -307,7 +307,49 @@ curl http://localhost:1337/api/v1/integrity-check
 | **Icons** | Lucide React | Latest |
 | **Emoji** | emoji-mart | Latest |
 | **Real-time** | Socket.io | 2 |
+| **i18n** | react-i18next | Latest |
+| **Desktop** | Electron + electron-builder + electron-updater | 33 |
 | **Crypto** | Web Crypto API (browser) + Node crypto | — |
+
+---
+
+## Desktop App (Electron)
+
+IOTA Free Forum is available as a standalone desktop application for Windows, macOS, and Linux. One-click install, zero configuration — the server runs embedded inside the app.
+
+### Download
+
+Download the latest release from [GitHub Releases](https://github.com/deduzzo/iota-free-forum/releases):
+
+| Platform | File | Auto-update |
+|----------|------|-------------|
+| **Windows** | `.exe` installer | Yes |
+| **macOS** | `.dmg` | Yes |
+| **Linux** | `.AppImage` | Yes |
+
+The app automatically checks for updates from GitHub Releases and notifies users when a new version is available.
+
+### Data Storage
+
+The desktop app stores all data in the user's application data directory:
+
+| Platform | Path |
+|----------|------|
+| **Windows** | `%APPDATA%\iota-free-forum-desktop\forum-data\` |
+| **macOS** | `~/Library/Application Support/iota-free-forum-desktop/forum-data/` |
+| **Linux** | `~/.config/iota-free-forum-desktop/forum-data/` |
+
+### Building from Source
+
+```bash
+# Build for current platform
+npm run desktop:build
+
+# Build for specific platform
+npm run desktop:build:win
+npm run desktop:build:mac
+npm run desktop:build:linux
+```
 
 ---
 
@@ -316,11 +358,14 @@ curl http://localhost:1337/api/v1/integrity-check
 | Command | Description |
 |---------|-------------|
 | `npm run dev` | Start backend + frontend in development |
-| `npm start` | Start in production mode |
+| `npm start` | Start in production mode (single port 1337) |
 | `npm run build` | Build frontend for production |
 | `npm run move:build` | Compile the Move smart contract |
 | `npm run move:deploy` | Compile + deploy contract to IOTA testnet |
 | `npm run move:install-cli` | Install the IOTA CLI tool |
+| `npm run desktop:dev` | Run Electron in development mode |
+| `npm run desktop:build` | Build desktop app for current platform |
+| `npm run release` | Interactive release script (version bump + build + GitHub Release) |
 
 ---
 

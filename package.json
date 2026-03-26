@@ -14,7 +14,13 @@
     "move:fetch-framework": "test -d .tmp/iota-framework/crates/iota-framework/packages/iota-framework/sources || (echo 'Downloading IOTA Move framework...' && mkdir -p .tmp && cd .tmp && rm -rf iota-framework && git clone --depth 1 --branch mainnet --filter=blob:none --sparse https://github.com/iotaledger/iota.git iota-framework && cd iota-framework && git sparse-checkout set crates/iota-framework/packages/iota-framework crates/iota-framework/packages/move-stdlib && echo 'Framework downloaded.')",
     "move:build": "npm run move:install-cli && npm run move:fetch-framework && cd move/forum && iota move build",
     "move:deploy": "npm run move:build && node api/utility/move-publish.js",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "desktop:dev": "cd desktop && npx electron main.js --dev",
+    "desktop:build": "npm run build && cd desktop && npm install && npx electron-builder --publish never",
+    "desktop:build:win": "npm run build && cd desktop && npm install && npx electron-builder --win --publish never",
+    "desktop:build:mac": "npm run build && cd desktop && npm install && npx electron-builder --mac --publish never",
+    "desktop:build:linux": "npm run build && cd desktop && npm install && npx electron-builder --linux --publish never",
+    "release": "./scripts/release.sh"
   },
   "dependencies": {
     "@iota/iota-sdk": "^1.10.1",

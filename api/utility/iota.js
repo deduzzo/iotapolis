@@ -11,7 +11,9 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-const CONFIG_PATH = path.resolve(__dirname, '../../config/private_iota_conf.js');
+const CONFIG_PATH = process.env.FORUM_DATA_DIR
+  ? path.join(process.env.FORUM_DATA_DIR, 'private_iota_conf.js')
+  : path.resolve(__dirname, '../../config/private_iota_conf.js');
 
 // Lazy-loaded SDK modules
 let _sdk = null;

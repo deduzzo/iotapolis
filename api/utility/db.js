@@ -13,7 +13,10 @@ const fs = require('fs');
 // Part 1: Init + Schema
 // ---------------------------------------------------------------------------
 
-const DB_PATH = path.resolve(__dirname, '../../.tmp/iota-forum.db');
+// Electron sets FORUM_DATA_DIR to appdata; otherwise use .tmp/
+const DB_PATH = process.env.FORUM_DATA_DIR
+  ? path.join(process.env.FORUM_DATA_DIR, 'iota-forum.db')
+  : path.resolve(__dirname, '../../.tmp/iota-forum.db');
 
 let database = null;
 

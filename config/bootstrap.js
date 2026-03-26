@@ -11,7 +11,10 @@ const path = require('path');
 const crypto = require('crypto');
 const db = require('../api/utility/db');
 
-const CONFIG_PATH = path.resolve(__dirname, 'private_iota_conf.js');
+// Electron sets FORUM_DATA_DIR to appdata; otherwise use config/
+const CONFIG_PATH = process.env.FORUM_DATA_DIR
+  ? path.join(process.env.FORUM_DATA_DIR, 'private_iota_conf.js')
+  : path.resolve(__dirname, 'private_iota_conf.js');
 
 /**
  * Auto-generate private_iota_conf.js if it doesn't exist.
