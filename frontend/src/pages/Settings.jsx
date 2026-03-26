@@ -108,13 +108,8 @@ export default function Settings() {
     sessionStorage.clear();
     addLog('sessionStorage cleared', 'success');
 
-    addToast('Reset completo! Ricarica la pagina.', 'success');
-    addLog('Full reset complete. Reload recommended.', 'success');
-    setLoading(l => ({ ...l, full: false }));
-    setConfirmReset(null);
-
-    // Auto-reload after 1.5s
-    setTimeout(() => window.location.reload(), 1500);
+    // Force reload immediately — no need to update state since page will refresh
+    window.location.href = '/setup';
   };
 
   // Export dei dati del server
