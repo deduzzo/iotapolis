@@ -50,7 +50,7 @@ export default function NewThread() {
 
     setSubmitting(true);
     try {
-      const res = await signAndSend('/api/v1/thread', 'POST', {
+      const res = await signAndSend('/api/v1/threads', 'POST', {
         categoryId,
         title: title.trim(),
         content: content.trim(),
