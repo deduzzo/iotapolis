@@ -1,4 +1,4 @@
-# Deploy Guide — IOTA Free Forum con Move Contract
+# Deploy Guide — IOTA Free Forum
 
 ## Prerequisiti
 
@@ -39,26 +39,25 @@ FRONTEND_PORT: 5174, // Frontend
 ## 4. Deploy dello Smart Contract
 
 ```bash
-# Compila e deploya in un comando (installa il CLI IOTA automaticamente)
 npm run move:deploy
 ```
 
-Questo:
+Questo comando:
 
-- Installa `iota` CLI via Homebrew (se assente)
-- Compila il contratto Move
-- Lo pubblica su testnet
-- Salva `FORUM_PACKAGE_ID`, `FORUM_OBJECT_ID`, `ADMIN_CAP_ID` nel config
-- Stampa la **connection string** da condividere
+1. Installa `iota` CLI via Homebrew (se assente)
+2. Scarica il framework IOTA Move in `.tmp/` (se assente)
+3. Compila il contratto `move/forum/sources/forum.move`
+4. Lo pubblica su testnet (richiede faucet automaticamente se il saldo e basso)
+5. Salva `FORUM_PACKAGE_ID`, `FORUM_OBJECT_ID`, `ADMIN_CAP_ID` nel config
+6. Stampa la **connection string** da condividere
+
+Chi deploya diventa automaticamente ADMIN (ruolo 3) nel contratto.
 
 ## 5. Avvio in produzione
 
 ```bash
-# Build frontend
-npm run build
-
-# Avvia in produzione
-npm start
+npm run build    # Build frontend
+npm start        # Avvia in produzione
 ```
 
 ## 6. Avvio in sviluppo
@@ -77,27 +76,58 @@ testnet:0xPACKAGE_ID:0xFORUM_OBJECT_ID
 ```
 
 Gli utenti la incollano in "Collegati a un forum esistente" nel setup.
+Il sistema sincronizza automaticamente tutti i dati dalla blockchain.
 
-## 8. Backup (importante!)
+## 8. Gestione ruoli
+
+Il sistema ha 4 livelli di ruolo, tutti verificati on-chain dallo smart contract:
+
+| Livello | Ruolo | Cosa puo fare |
+|---------|-------|---------------|
+| 0 | BANNED | Nessuna operazione (bloccato on-chain) |
+| 1 | USER | Creare thread, postare, votare |
+| 2 | MODERATOR | + creare categorie, nascondere post, bannare utenti |
+| 3 | ADMIN | + gestire config forum, promuovere/degradare utenti |
+
+Regole:
+- **Non puoi promuovere qualcuno a un ruolo >= al tuo**
+- **Non puoi modificare utenti con ruolo >= al tuo**
+- **Non puoi cambiare il tuo stesso ruolo**
+- Ogni nuovo utente parte come USER (ruolo 1)
+- Chi deploya il contratto e ADMIN (ruolo 3)
+- Un utente bannato (ruolo 0) non puo eseguire nessuna operazione: la transazione viene rifiutata dai validatori IOTA
+
+## 9. Backup (importante!)
 
 Salva in un posto sicuro:
 
 - `config/private_iota_conf.js` — contiene mnemonic (wallet), chiavi RSA, e IDs del contratto
 - Il mnemonic e la chiave del wallet admin. **Se lo perdi, perdi il controllo admin del forum.**
 
-## 9. Cambio network (testnet → mainnet)
+## 10. Reset totale
+
+Dalla pagina Impostazioni o via API:
+
+1. Nuovo wallet generato
+2. Nuove chiavi RSA
+3. DB locale svuotato
+4. IDs del contratto Move azzerati
+5. **Devi ri-deployare**: `npm run move:deploy`
+6. Riavvia il server
+
+## 11. Cambio network (testnet → mainnet)
 
 In `config/private_iota_conf.js`:
 
 ```javascript
 IOTA_NETWORK: 'mainnet',
-IOTA_MNEMONIC: null,           // Resettera e generera un nuovo wallet
-FORUM_PACKAGE_ID: null,         // Da ri-deployare
+IOTA_MNEMONIC: null,
+FORUM_PACKAGE_ID: null,
 FORUM_OBJECT_ID: null,
 ADMIN_CAP_ID: null,
 ```
 
-Poi ri-esegui:
+Poi:
 
 ```bash
 npm run dev          # Genera nuovo wallet mainnet
@@ -106,40 +136,52 @@ npm run move:deploy  # Deploy su mainnet
 npm start
 ```
 
-## Comandi utili
+## Comandi
 
 | Comando | Descrizione |
-|---|---|
+|---------|-------------|
 | `npm run dev` | Avvia backend + frontend in sviluppo |
 | `npm start` | Avvia in produzione |
 | `npm run build` | Build frontend |
 | `npm run move:build` | Compila solo il contratto Move |
 | `npm run move:deploy` | Compila + deploya il contratto |
 | `npm run move:install-cli` | Installa solo il CLI IOTA |
+| `npm run move:fetch-framework` | Scarica il framework IOTA Move in .tmp/ |
 
 ## Architettura
 
 ```
-Utente A (admin)                    Utente B
-    |                                   |
-    v                                   v
-[wallet A] ---moveCall--->  [Move Contract on IOTA]  <---moveCall--- [wallet B]
-                                |
-                          Forum (shared object)
-                          - users registry (Table)
-                          - event_count
-                          - admin address
-                                |
-                          ForumEvent (emitted)
-                          - tag, entity_id, data(gzip)
-                          - version, author, timestamp
-                                |
-                    queryEvents({ package: PKG_ID })
-                                |
-                    +-----------+-----------+
-                    |                       |
-              [SQLite cache A]        [SQLite cache B]
-              (ricostruita)           (ricostruita)
+Utente A (admin)                     Utente B (user)
+    |                                    |
+    v                                    v
+[wallet A] ----moveCall---->  [Smart Contract Move]  <----moveCall---- [wallet B]
+                                     |
+                               Forum (shared object)
+                               |-- users: Table<address, u8>
+                               |   |-- 0x9543... -> 3 (ADMIN)
+                               |   |-- 0x00329.. -> 1 (USER)
+                               |   |-- 0xabc12.. -> 0 (BANNED)
+                               |-- event_count, user_count
+                               |-- admin: address
+                                     |
+                        Ogni funzione verifica il ruolo:
+                        register()         -> aperta
+                        post_event()       -> ruolo >= 1 (USER)
+                        mod_post_event()   -> ruolo >= 2 (MOD)
+                        admin_post_event() -> ruolo >= 3 (ADMIN)
+                        set_user_role()    -> ruolo >= 2 (MOD)
+                                     |
+                               ForumEvent (emitted)
+                               |-- tag, entity_id, data(gzip)
+                               |-- version, author, timestamp
+                                     |
+                         queryEvents({ package: PKG_ID })
+                                     |
+                         +-----------+-----------+
+                         |                       |
+                   [SQLite cache A]        [SQLite cache B]
+                   (ricostruita)           (ricostruita)
 ```
 
 Ogni utente paga il proprio gas. Su testnet e gratis (faucet automatico).
+I permessi sono verificati dai validatori IOTA — nessun client o server puo bypassarli.
