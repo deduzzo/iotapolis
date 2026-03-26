@@ -50,6 +50,7 @@ export default function Settings() {
   const addToast = useToast();
   const [loading, setLoading] = useState({});
   const [confirmReset, setConfirmReset] = useState(null);
+  const [doubleConfirm, setDoubleConfirm] = useState(false);
   const [logs, setLogs] = useState([]);
 
   const addLog = (msg, type = 'info') => {
@@ -57,16 +58,20 @@ export default function Settings() {
     setLogs(prev => [{ ts, msg, type }, ...prev].slice(0, 100));
   };
 
-  // Reset solo cache SQLite server-side
+  // Reset cache SQLite senza risincronizzazione
   const resetCache = async () => {
     setLoading(l => ({ ...l, cache: true }));
-    addLog('Resetting server cache...');
+    addLog('Resetting server cache (no resync)...');
     try {
-      const res = await fetch('/api/v1/sync-reset', { method: 'POST' });
+      const res = await fetch('/api/v1/sync-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resync: false }),
+      });
       const data = await res.json();
       if (data.success) {
-        addLog('Server cache cleared + resync started', 'success');
-        addToast('Cache server azzerata e resync avviata', 'success');
+        addLog('Server cache cleared (no resync)', 'success');
+        addToast('Cache server azzerata', 'success');
       } else {
         addLog(`Cache reset failed: ${data.error}`, 'error');
         addToast('Errore reset cache: ' + (data.error || 'Unknown'), 'error');
@@ -78,6 +83,29 @@ export default function Settings() {
     setLoading(l => ({ ...l, cache: false }));
   };
 
+  // Risincronizza dalla blockchain (ricarica i dati on-chain nel DB locale)
+  const resyncFromChain = async () => {
+    setLoading(l => ({ ...l, resync: true }));
+    addLog('Starting resync from blockchain...');
+    try {
+      const res = await fetch('/api/v1/sync-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resync: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        addLog('Cache cleared + resync from blockchain started', 'success');
+        addToast('Risincronizzazione dalla blockchain avviata', 'success');
+      } else {
+        addLog(`Resync failed: ${data.error}`, 'error');
+      }
+    } catch (err) {
+      addLog(`Resync error: ${err.message}`, 'error');
+    }
+    setLoading(l => ({ ...l, resync: false }));
+  };
+
   // Reset identità locale (localStorage)
   const resetIdentity = () => {
     addLog('Clearing local identity...');
@@ -87,22 +115,26 @@ export default function Settings() {
     setConfirmReset(null);
   };
 
-  // Full reset: cache + identity + localStorage
+  // Full reset: new wallet + clear DB + clear browser
   const fullReset = async () => {
     setLoading(l => ({ ...l, full: true }));
-    addLog('Starting FULL reset...');
+    addLog('Starting FULL reset (new wallet + clear everything)...');
 
-    // 1. Reset server cache
+    // 1. Server-side full reset (new mnemonic, new wallet, clear DB, new RSA keys)
     try {
-      await fetch('/api/v1/sync-reset', { method: 'POST' });
-      addLog('Server cache cleared', 'success');
+      const res = await fetch('/api/v1/full-reset', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        addLog(`Server reset OK. New wallet: ${data.newAddress}`, 'success');
+      } else {
+        addLog(`Server reset failed: ${data.error}`, 'error');
+      }
     } catch (err) {
-      addLog(`Server cache reset failed: ${err.message}`, 'error');
+      addLog(`Server reset error: ${err.message}`, 'error');
     }
 
     // 2. Clear all localStorage
     localStorage.clear();
-    addLog('localStorage cleared', 'success');
 
     // 3. Clear sessionStorage
     sessionStorage.clear();
@@ -203,10 +235,18 @@ export default function Settings() {
 
         <ActionCard
           icon={RotateCcw}
+          title="Risincronizza dalla blockchain"
+          description="Svuota il database locale e riscarica tutti i dati dalla blockchain. Utile se il DB locale è corrotto o incompleto."
+          buttonText="Risincronizza"
+          onAction={resyncFromChain}
+          loading={loading.resync}
+        />
+
+        <ActionCard
+          icon={Database}
           title="Reset cache server"
-          description="Svuota il database SQLite locale e avvia una risincronizzazione dalla blockchain. I dati on-chain non vengono toccati."
+          description="Svuota il database SQLite locale senza risincronizzare. Il database resterà vuoto fino alla prossima risincronizzazione."
           buttonText="Reset Cache"
-          buttonColor="warning"
           onAction={resetCache}
           loading={loading.cache}
         />
@@ -222,8 +262,8 @@ export default function Settings() {
 
         <ActionCard
           icon={Trash2}
-          title="Reset completo"
-          description="Cancella TUTTO: cache server, identità locale, localStorage, sessionStorage. Il forum riparte da zero. I dati on-chain restano."
+          title="Reset totale"
+          description="Genera un NUOVO wallet IOTA (nuovo indirizzo), nuove chiavi RSA server, svuota tutto. Il forum riparte completamente da zero. I vecchi dati on-chain restano sul vecchio indirizzo."
           buttonText="Reset Totale"
           danger
           onAction={() => setConfirmReset('full')}
@@ -231,7 +271,7 @@ export default function Settings() {
         />
       </div>
 
-      {/* Confirm modal */}
+      {/* Confirm modal — double confirmation for full reset */}
       <AnimatePresence>
         {confirmReset && (
           <motion.div
@@ -240,7 +280,7 @@ export default function Settings() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <div className="absolute inset-0 bg-black/60" onClick={() => setConfirmReset(null)} />
+            <div className="absolute inset-0 bg-black/60" onClick={() => { setConfirmReset(null); setDoubleConfirm(false); }} />
             <motion.div
               className="glass-card relative p-6 rounded-xl max-w-md mx-4"
               initial={{ scale: 0.9, opacity: 0 }}
@@ -250,28 +290,67 @@ export default function Settings() {
             >
               <div className="flex items-center gap-3 mb-4">
                 <AlertTriangle size={24} style={{ color: 'var(--color-danger)' }} />
-                <h3 className="text-lg font-bold">Conferma</h3>
+                <h3 className="text-lg font-bold">
+                  {confirmReset === 'full' && doubleConfirm ? 'Ultima conferma' : 'Conferma'}
+                </h3>
               </div>
-              <p className="mb-6" style={{ color: 'var(--color-text-muted)' }}>
-                {confirmReset === 'identity'
-                  ? 'Sei sicuro di voler cancellare la tua identità locale? Se non hai un backup, perderai l\'accesso al tuo account.'
-                  : 'Sei sicuro di voler fare un reset completo? Cache server, identità locale e tutti i dati nel browser verranno cancellati.'
-                }
-              </p>
+
+              {confirmReset === 'identity' && (
+                <p className="mb-6" style={{ color: 'var(--color-text-muted)' }}>
+                  Sei sicuro di voler cancellare la tua identita locale? Se non hai un backup, perderai l'accesso al tuo account.
+                </p>
+              )}
+
+              {confirmReset === 'full' && !doubleConfirm && (
+                <div className="mb-6 space-y-3">
+                  <p style={{ color: 'var(--color-danger)' }} className="font-semibold">
+                    Operazione distruttiva e irreversibile!
+                  </p>
+                  <p style={{ color: 'var(--color-text-muted)' }}>
+                    Questo genera un <strong style={{ color: 'var(--color-text)' }}>nuovo wallet IOTA</strong> con un nuovo indirizzo.
+                    Tutti i dati locali verranno cancellati. Il forum riparte completamente da zero.
+                  </p>
+                  <p style={{ color: 'var(--color-text-muted)' }}>
+                    I vecchi dati on-chain restano sulla blockchain al vecchio indirizzo, ma non saranno piu associati a questa istanza.
+                  </p>
+                </div>
+              )}
+
+              {confirmReset === 'full' && doubleConfirm && (
+                <div className="mb-6 space-y-3">
+                  <p style={{ color: 'var(--color-danger)' }} className="font-bold text-lg">
+                    Sei davvero sicuro?
+                  </p>
+                  <p style={{ color: 'var(--color-text-muted)' }}>
+                    Non potrai annullare questa operazione. Il vecchio wallet e tutti i dati locali andranno persi definitivamente.
+                    Assicurati di aver esportato tutto cio che ti serve.
+                  </p>
+                </div>
+              )}
+
               <div className="flex justify-end gap-3">
                 <button
                   className="px-4 py-2 rounded-lg text-sm"
                   style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', borderRadius: 'var(--border-radius)' }}
-                  onClick={() => setConfirmReset(null)}
+                  onClick={() => { setConfirmReset(null); setDoubleConfirm(false); }}
                 >
                   Annulla
                 </button>
                 <button
                   className="px-4 py-2 rounded-lg text-sm font-medium"
                   style={{ backgroundColor: 'var(--color-danger)', color: '#fff', borderRadius: 'var(--border-radius)' }}
-                  onClick={confirmReset === 'identity' ? resetIdentity : fullReset}
+                  onClick={() => {
+                    if (confirmReset === 'identity') {
+                      resetIdentity();
+                    } else if (confirmReset === 'full' && !doubleConfirm) {
+                      setDoubleConfirm(true);
+                    } else if (confirmReset === 'full' && doubleConfirm) {
+                      setDoubleConfirm(false);
+                      fullReset();
+                    }
+                  }}
                 >
-                  Conferma
+                  {confirmReset === 'full' && !doubleConfirm ? 'Continua' : 'Conferma Reset Totale'}
                 </button>
               </div>
             </motion.div>

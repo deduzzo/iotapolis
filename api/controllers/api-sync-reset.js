@@ -4,7 +4,9 @@ module.exports = {
   friendlyName: 'API Sync Reset',
   description: 'Drop and recreate the cache database, then resync from blockchain.',
 
-  inputs: {},
+  inputs: {
+    resync: { type: 'boolean', defaultsTo: false, description: 'If true, resync from blockchain after clearing. If false, just clear.' },
+  },
 
   exits: {
     success: { statusCode: 200 },
@@ -27,20 +29,27 @@ module.exports = {
         INSERT INTO search_index(search_index) VALUES('delete-all');
       `);
 
-      sails.log.info('[sync-reset] Cache cleared');
-
-      // Start resync in background
+      // Also clear retry queue
       try {
-        const ForumManager = require('../utility/ForumManager');
-        if (ForumManager && typeof ForumManager.syncFromBlockchain === 'function') {
-          ForumManager.syncFromBlockchain().then(() => {
-            sails.log.info('[sync-reset] Resync completed');
-          }).catch((err) => {
-            sails.log.warn('[sync-reset] Resync failed:', err.message);
-          });
+        database.exec('DROP TABLE IF EXISTS tx_retry_queue');
+      } catch (e) { /* table might not exist */ }
+
+      sails.log.info('[sync-reset] Cache cleared completely');
+
+      // Only resync if explicitly requested
+      if (inputs.resync) {
+        try {
+          const ForumManager = require('../utility/ForumManager');
+          if (ForumManager && typeof ForumManager.syncFromBlockchain === 'function') {
+            ForumManager.syncFromBlockchain().then(() => {
+              sails.log.info('[sync-reset] Resync completed');
+            }).catch((err) => {
+              sails.log.warn('[sync-reset] Resync failed:', err.message);
+            });
+          }
+        } catch (e) {
+          sails.log.warn('[sync-reset] ForumManager not available for resync');
         }
-      } catch (e) {
-        sails.log.warn('[sync-reset] ForumManager not available for resync');
       }
 
       // Broadcast
@@ -51,7 +60,8 @@ module.exports = {
 
       return {
         success: true,
-        message: 'Cache cleared. Resync started in background.',
+        message: inputs.resync ? 'Cache cleared. Resync started in background.' : 'Cache cleared. No resync.',
+        resyncing: inputs.resync,
       };
     } catch (err) {
       sails.log.error('[api-sync-reset]', err.message || err);
