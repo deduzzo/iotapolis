@@ -297,6 +297,78 @@ async function waitForFunds(maxWaitMs = 30000) {
   return { ready: false };
 }
 
+/**
+ * Merge all IOTA coins into a single coin to avoid fragmentation.
+ * After splitCoins TXs, the wallet may have hundreds of micro-coins.
+ */
+/**
+ * Merge all IOTA coins into a single coin to avoid fragmentation.
+ * Uses pagination to find all coins and selects the largest as gas.
+ * Merges in batches of 256 (IOTA limit per mergeCoins command).
+ */
+async function _mergeAllCoins() {
+  try {
+    const sdk = await loadSdk();
+    const client = await getClient();
+    const keypair = await getKeypair();
+    const address = await getAddress();
+
+    // Fetch ALL coins with pagination
+    let allCoins = [];
+    let cursor = null;
+    let hasMore = true;
+    while (hasMore) {
+      const batch = await client.getCoins({ owner: address, cursor });
+      allCoins = allCoins.concat(batch.data);
+      hasMore = batch.hasNextPage;
+      cursor = batch.nextCursor;
+    }
+
+    if (allCoins.length <= 1) return;
+
+    console.log(`[iota] Merging ${allCoins.length} coins into one...`);
+
+    // Sort by balance descending — use largest as gas
+    allCoins.sort((a, b) => (BigInt(b.balance) > BigInt(a.balance) ? 1 : -1));
+    const gasCoin = allCoins[0];
+    const others = allCoins.slice(1);
+
+    // Merge in batches of 256 (IOTA limits mergeCoins arguments)
+    const MERGE_BATCH = 256;
+    for (let i = 0; i < others.length; i += MERGE_BATCH) {
+      const batch = others.slice(i, i + MERGE_BATCH);
+      const tx = new sdk.Transaction();
+      tx.setGasPayment([{ objectId: gasCoin.coinObjectId, version: gasCoin.version, digest: gasCoin.digest }]);
+      tx.mergeCoins(tx.gas, batch.map(c => tx.object(c.coinObjectId)));
+      tx.setGasBudget(50000000);
+
+      const result = await client.signAndExecuteTransaction({
+        signer: keypair, transaction: tx, options: { showEffects: true },
+      });
+      await client.waitForTransaction({ digest: result.digest });
+      console.log(`[iota] Merge batch ${Math.floor(i / MERGE_BATCH) + 1}: merged ${batch.length} coins`);
+
+      // Update gasCoin version for next batch
+      if (i + MERGE_BATCH < others.length) {
+        await new Promise(r => setTimeout(r, 500));
+        const refreshed = await client.getCoins({ owner: address, limit: 1 });
+        if (refreshed.data.length > 0) {
+          const largest = refreshed.data.sort((a, b) => (BigInt(b.balance) > BigInt(a.balance) ? 1 : -1))[0];
+          gasCoin.coinObjectId = largest.coinObjectId;
+          gasCoin.version = largest.version;
+          gasCoin.digest = largest.digest;
+        }
+      }
+    }
+
+    await new Promise(r => setTimeout(r, 1000));
+    const after = await client.getCoins({ owner: address });
+    console.log(`[iota] Merge complete: ${after.data.length} coins remaining`);
+  } catch (e) {
+    console.log('[iota] Merge coins failed (non-fatal):', e.message);
+  }
+}
+
 // --- Pubblicazione dati ---
 
 // --- Encoding/Decoding payload in transazioni ---
@@ -379,6 +451,46 @@ function _decodeChunksToBufferV1(u64Values, payloadLength) {
 let _pendingTxCount = 0;
 
 async function publishData(tag, dataObject, entityId = null, version = null) {
+  // Pre-flight: ensure wallet has funds and coins are merged
+  try {
+    const client = await getClient();
+    const address = await getAddress();
+
+    // Fetch all coins to check state
+    let allCoins = [];
+    let cursor = null;
+    let hasMore = true;
+    while (hasMore) {
+      const batch = await client.getCoins({ owner: address, cursor });
+      allCoins = allCoins.concat(batch.data);
+      hasMore = batch.hasNextPage;
+      cursor = batch.nextCursor;
+    }
+
+    const totalBalance = allCoins.reduce((s, c) => s + BigInt(c.balance), 0n);
+    const minRequired = 500000000n; // 0.5 IOTA minimum to publish
+
+    if (totalBalance < minRequired) {
+      const config = _getConfig();
+      const network = config.IOTA_NETWORK || 'testnet';
+      if (network === 'testnet' || network === 'devnet') {
+        console.log(`[iota] Balance too low (${totalBalance} nanos). Requesting faucet...`);
+        try { await requestFaucet(); } catch (e) { /* */ }
+        await waitForFunds(15000);
+      } else {
+        return { success: false, digest: null, error: `Insufficient balance: ${totalBalance} nanos. Minimum required: ${minRequired}. Please fund the wallet.` };
+      }
+    }
+
+    // Merge coins if too fragmented (>5 coins)
+    if (allCoins.length > 5) {
+      console.log(`[iota] Wallet fragmented (${allCoins.length} coins). Merging before publish...`);
+      await _mergeAllCoins();
+    }
+  } catch (e) {
+    console.log('[iota] Pre-flight check failed (non-fatal):', e.message);
+  }
+
   // Serializza le TX: IOTA non permette TX parallele dallo stesso wallet
   _pendingTxCount++;
   try {
@@ -456,8 +568,9 @@ async function _publishSingleTx(marker, payloadBuf) {
     tx.transferObjects([allCoins[i]], tx.pure.address(address));
   }
 
-  // Gas budget: generous scaling
-  tx.setGasBudget(Math.max(100000000, allCoins.length * 3000000));
+  // Gas budget: enough for split+transfer commands without over-reserving
+  // Each split+transfer pair uses ~500K-1M gas. Use 1M per coin + 50M base.
+  tx.setGasBudget(Math.max(50000000, allCoins.length * 1000000));
 
   const result = await client.signAndExecuteTransaction({
     signer: keypair,
@@ -523,6 +636,10 @@ async function _publishDataImpl(tag, dataObject, entityId = null, version = null
     let lastResult = null;
 
     for (let i = 0; i < parts.length; i++) {
+      // Merge all coins back into one before each chain part (avoid fragmentation)
+      if (i > 0) {
+        await _mergeAllCoins();
+      }
       const partWrapper = JSON.stringify({
         app: APP_TAG,
         _chain: {
