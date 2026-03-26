@@ -9,7 +9,7 @@ module.exports = {
     postId: { type: 'string', required: true },
     action: { type: 'string', required: true },
     reason: { type: 'string', allowNull: true },
-    moderatorId: { type: 'string', required: true },
+    authorId: { type: 'string' },
     nonce: { type: 'string', required: true },
     createdAt: { type: 'number', required: true },
     publicKey: { type: 'string', required: true },
@@ -26,17 +26,15 @@ module.exports = {
   fn: async function (inputs) {
     try {
       const { userId } = await sails.helpers.verifySignature(this.req.body);
-
-      if (userId !== inputs.moderatorId) {
-        this.res.status(403);
-        return { success: false, error: 'Author mismatch' };
-      }
+      console.log('[moderate] Verified userId:', userId);
 
       // Check user has moderator or admin role
       const Users = db.getModel('users');
       const user = Users.findOne({ id: userId });
+      console.log('[moderate] User:', user ? `${user.username} role=${user.role}` : 'NOT FOUND');
       if (!user || (user.role !== 'moderator' && user.role !== 'admin')) {
-        throw 'forbidden';
+        this.res.status(403);
+        return { success: false, error: `Access denied. Role: ${user?.role || 'not found'}` };
       }
 
       // Validate action
