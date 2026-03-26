@@ -8,7 +8,7 @@ module.exports = {
   inputs: {
     bio: { type: 'string', allowNull: true },
     avatar: { type: 'string', allowNull: true },
-    authorId: { type: 'string', required: true },
+    authorId: { type: 'string' },
     nonce: { type: 'string', required: true },
     version: { type: 'number', required: true },
     createdAt: { type: 'number', required: true },
@@ -40,7 +40,7 @@ module.exports = {
 
       const newVersion = (user.version || 1) + 1;
 
-      // Publish to blockchain
+      // Publish to blockchain (processTransaction handles cache)
       const ForumManager = require('../utility/ForumManager');
       const txResult = await ForumManager.publishToChain(ForumTags.FORUM_USER, userId, {
         username: user.username,
@@ -52,11 +52,10 @@ module.exports = {
         createdAt: inputs.createdAt,
       });
 
-      // Update cache
-      const updated = Users.update(userId, {
-        bio: inputs.bio !== undefined ? inputs.bio : user.bio,
-        avatar: inputs.avatar !== undefined ? inputs.avatar : user.avatar,
-      });
+      if (!txResult || !txResult.success) {
+        this.res.status(500);
+        return { success: false, error: txResult?.error || 'Blockchain publish failed' };
+      }
 
       // Update search index
       db.updateFtsIndex(userId, user.username, inputs.bio || '');
@@ -70,7 +69,7 @@ module.exports = {
 
       return {
         success: true,
-        user: updated,
+        user: { id: userId, version: newVersion },
         digest: txResult?.digest || null,
       };
     } catch (err) {

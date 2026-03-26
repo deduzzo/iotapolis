@@ -6,11 +6,10 @@ module.exports = {
   description: 'Create a new thread in a category.',
 
   inputs: {
-    id: { type: 'string', required: true },
     categoryId: { type: 'string', required: true },
     title: { type: 'string', required: true },
     content: { type: 'string', required: true },
-    authorId: { type: 'string', required: true },
+    authorId: { type: 'string' },
     encrypted: { type: 'boolean', defaultsTo: false },
     encryptedTitle: { type: 'boolean', defaultsTo: false },
     keyBundle: { type: 'ref', defaultsTo: null },
@@ -32,12 +31,6 @@ module.exports = {
     try {
       const { userId } = await sails.helpers.verifySignature(this.req.body);
 
-      // Verify author matches signature
-      if (userId !== inputs.authorId) {
-        this.res.status(403);
-        return { success: false, error: 'Author mismatch' };
-      }
-
       // Check user exists and not banned
       const Users = db.getModel('users');
       const user = Users.findOne({ id: userId });
@@ -55,21 +48,17 @@ module.exports = {
         throw 'notFound';
       }
 
-      // Validate thread id format: THR_ + nonce first 8
-      const expectedId = 'THR_' + inputs.nonce.substring(0, 8);
-      if (inputs.id !== expectedId) {
-        this.res.status(400);
-        return { success: false, error: 'Invalid thread ID format' };
-      }
+      // Generate thread ID server-side from nonce
+      const threadId = 'THR_' + inputs.nonce.substring(0, 8);
 
-      // Publish to blockchain
+      // Publish to blockchain (processTransaction handles cache)
       const ForumManager = require('../utility/ForumManager');
-      const txResult = await ForumManager.publishToChain(ForumTags.FORUM_THREAD, inputs.id, {
-        id: inputs.id,
+      const txResult = await ForumManager.publishToChain(ForumTags.FORUM_THREAD, threadId, {
+        id: threadId,
         categoryId: inputs.categoryId,
         title: inputs.title,
         content: inputs.content,
-        authorId: inputs.authorId,
+        authorId: userId,
         encrypted: inputs.encrypted,
         encryptedTitle: inputs.encryptedTitle,
         keyBundle: inputs.keyBundle,
@@ -78,43 +67,27 @@ module.exports = {
         createdAt: inputs.createdAt,
       });
 
-      // Cache
-      const Threads = db.getModel('threads');
-      const now = Date.now();
-      const thread = Threads.create({
-        id: inputs.id,
-        categoryId: inputs.categoryId,
-        title: inputs.title,
-        content: inputs.content,
-        authorId: inputs.authorId,
-        encrypted: inputs.encrypted,
-        encryptedTitle: inputs.encryptedTitle,
-        keyBundle: inputs.keyBundle ? JSON.stringify(inputs.keyBundle) : null,
-        pinned: false,
-        locked: false,
-        hidden: false,
-        version: 1,
-        lastPostAt: now,
-        postCount: 0,
-        createdAt: inputs.createdAt,
-      });
+      if (!txResult || !txResult.success) {
+        this.res.status(500);
+        return { success: false, error: txResult?.error || 'Blockchain publish failed' };
+      }
 
       // Update search index (skip encrypted content)
       if (!inputs.encrypted) {
-        db.updateFtsIndex(inputs.id, inputs.title, inputs.content);
+        db.updateFtsIndex(threadId, inputs.title, inputs.content);
       }
 
       // Broadcast
       await sails.helpers.broadcastEvent('dataChanged', {
         action: 'threadCreated',
         label: inputs.title,
-        threadId: inputs.id,
+        threadId,
         categoryId: inputs.categoryId,
       });
 
       return {
         success: true,
-        thread,
+        thread: { id: threadId },
         digest: txResult?.digest || null,
       };
     } catch (err) {

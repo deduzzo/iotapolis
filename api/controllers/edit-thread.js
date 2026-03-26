@@ -8,7 +8,7 @@ module.exports = {
   inputs: {
     title: { type: 'string', required: true },
     content: { type: 'string', required: true },
-    authorId: { type: 'string', required: true },
+    authorId: { type: 'string' },
     encrypted: { type: 'boolean', defaultsTo: false },
     encryptedTitle: { type: 'boolean', defaultsTo: false },
     keyBundle: { type: 'ref', defaultsTo: null },
@@ -45,7 +45,7 @@ module.exports = {
 
       const newVersion = (thread.version || 1) + 1;
 
-      // Publish to blockchain
+      // Publish to blockchain (processTransaction handles cache)
       const ForumManager = require('../utility/ForumManager');
       const txResult = await ForumManager.publishToChain(ForumTags.FORUM_THREAD, threadId, {
         id: threadId,
@@ -61,15 +61,10 @@ module.exports = {
         createdAt: inputs.createdAt,
       });
 
-      // Update cache
-      const updated = Threads.update(threadId, {
-        title: inputs.title,
-        content: inputs.content,
-        encrypted: inputs.encrypted,
-        encryptedTitle: inputs.encryptedTitle,
-        keyBundle: inputs.keyBundle ? JSON.stringify(inputs.keyBundle) : thread.keyBundle,
-        version: newVersion,
-      });
+      if (!txResult || !txResult.success) {
+        this.res.status(500);
+        return { success: false, error: txResult?.error || 'Blockchain publish failed' };
+      }
 
       // Update search index
       if (!inputs.encrypted) {
@@ -86,7 +81,7 @@ module.exports = {
 
       return {
         success: true,
-        thread: updated,
+        thread: { id: threadId, version: newVersion },
         digest: txResult?.digest || null,
       };
     } catch (err) {

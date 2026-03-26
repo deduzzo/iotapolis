@@ -6,11 +6,10 @@ module.exports = {
   description: 'Create a new post or reply in a thread.',
 
   inputs: {
-    id: { type: 'string', required: true },
     threadId: { type: 'string', required: true },
     parentId: { type: 'string', allowNull: true },
     content: { type: 'string', required: true },
-    authorId: { type: 'string', required: true },
+    authorId: { type: 'string' },
     nonce: { type: 'string', required: true },
     version: { type: 'number', defaultsTo: 1 },
     createdAt: { type: 'number', required: true },
@@ -28,11 +27,6 @@ module.exports = {
   fn: async function (inputs) {
     try {
       const { userId } = await sails.helpers.verifySignature(this.req.body);
-
-      if (userId !== inputs.authorId) {
-        this.res.status(403);
-        return { success: false, error: 'Author mismatch' };
-      }
 
       // Check user exists and not banned
       const Users = db.getModel('users');
@@ -55,39 +49,26 @@ module.exports = {
         return { success: false, error: 'Thread is locked' };
       }
 
-      // Validate post id format: POST_ + nonce first 8
-      const expectedId = 'POST_' + inputs.nonce.substring(0, 8);
-      if (inputs.id !== expectedId) {
-        this.res.status(400);
-        return { success: false, error: 'Invalid post ID format' };
-      }
+      // Generate post ID server-side from nonce
+      const postId = 'POST_' + inputs.nonce.substring(0, 8);
 
-      // Publish to blockchain
+      // Publish to blockchain (processTransaction handles cache)
       const ForumManager = require('../utility/ForumManager');
-      const txResult = await ForumManager.publishToChain(ForumTags.FORUM_POST, inputs.id, {
-        id: inputs.id,
+      const txResult = await ForumManager.publishToChain(ForumTags.FORUM_POST, postId, {
+        id: postId,
         threadId: inputs.threadId,
         parentId: inputs.parentId || null,
         content: inputs.content,
-        authorId: inputs.authorId,
+        authorId: userId,
         nonce: inputs.nonce,
         version: 1,
         createdAt: inputs.createdAt,
       });
 
-      // Cache post
-      const Posts = db.getModel('posts');
-      const post = Posts.create({
-        id: inputs.id,
-        threadId: inputs.threadId,
-        parentId: inputs.parentId || null,
-        content: inputs.content,
-        authorId: inputs.authorId,
-        hidden: false,
-        version: 1,
-        score: 0,
-        createdAt: inputs.createdAt,
-      });
+      if (!txResult || !txResult.success) {
+        this.res.status(500);
+        return { success: false, error: txResult?.error || 'Blockchain publish failed' };
+      }
 
       // Update thread stats
       const now = Date.now();
@@ -97,19 +78,19 @@ module.exports = {
       });
 
       // Update search index
-      db.updateFtsIndex(inputs.id, '', inputs.content);
+      db.updateFtsIndex(postId, '', inputs.content);
 
       // Broadcast
       await sails.helpers.broadcastEvent('dataChanged', {
         action: 'postCreated',
-        label: inputs.id,
+        label: postId,
         threadId: inputs.threadId,
-        postId: inputs.id,
+        postId,
       });
 
       return {
         success: true,
-        post,
+        post: { id: postId },
         digest: txResult?.digest || null,
       };
     } catch (err) {

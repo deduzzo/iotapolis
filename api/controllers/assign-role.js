@@ -9,7 +9,7 @@ module.exports = {
     targetUserId: { type: 'string', required: true },
     role: { type: 'string', required: true },
     categoryId: { type: 'string', allowNull: true },
-    grantedBy: { type: 'string', required: true },
+    grantedBy: { type: 'string' },
     nonce: { type: 'string', required: true },
     createdAt: { type: 'number', required: true },
     publicKey: { type: 'string', required: true },
@@ -26,11 +26,6 @@ module.exports = {
   fn: async function (inputs) {
     try {
       const { userId } = await sails.helpers.verifySignature(this.req.body);
-
-      if (userId !== inputs.grantedBy) {
-        this.res.status(403);
-        return { success: false, error: 'Author mismatch' };
-      }
 
       // Check user is admin
       const Users = db.getModel('users');
@@ -52,9 +47,10 @@ module.exports = {
         return { success: false, error: 'Invalid role. Must be: ' + validRoles.join(', ') };
       }
 
-      const roleId = `ROLE_${inputs.targetUserId}_${Date.now()}`;
+      // Generate role ID server-side from nonce
+      const roleId = `ROLE_${inputs.nonce.substring(0, 8)}`;
 
-      // Publish to blockchain
+      // Publish to blockchain (processTransaction handles cache)
       const ForumManager = require('../utility/ForumManager');
       const txResult = await ForumManager.publishToChain(ForumTags.FORUM_ROLE, roleId, {
         targetUserId: inputs.targetUserId,
@@ -65,16 +61,10 @@ module.exports = {
         createdAt: inputs.createdAt,
       });
 
-      // Cache role record
-      const Roles = db.getModel('roles');
-      Roles.create({
-        id: roleId,
-        targetUserId: inputs.targetUserId,
-        role: inputs.role,
-        categoryId: inputs.categoryId || null,
-        grantedBy: userId,
-        createdAt: inputs.createdAt,
-      });
+      if (!txResult || !txResult.success) {
+        this.res.status(500);
+        return { success: false, error: txResult?.error || 'Blockchain publish failed' };
+      }
 
       // Update user role in cache
       Users.update(inputs.targetUserId, { role: inputs.role });

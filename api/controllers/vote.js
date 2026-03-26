@@ -8,7 +8,7 @@ module.exports = {
   inputs: {
     postId: { type: 'string', required: true },
     vote: { type: 'number', required: true },
-    authorId: { type: 'string', required: true },
+    authorId: { type: 'string' },
     nonce: { type: 'string', required: true },
     version: { type: 'number', defaultsTo: 1 },
     createdAt: { type: 'number', required: true },
@@ -26,11 +26,6 @@ module.exports = {
     try {
       const { userId } = await sails.helpers.verifySignature(this.req.body);
 
-      if (userId !== inputs.authorId) {
-        this.res.status(403);
-        return { success: false, error: 'Author mismatch' };
-      }
-
       // Validate vote value
       if (inputs.vote !== 1 && inputs.vote !== -1) {
         this.res.status(400);
@@ -44,9 +39,10 @@ module.exports = {
         throw 'notFound';
       }
 
+      // Generate vote ID server-side
       const voteId = `VOTE_${inputs.postId}_${userId}`;
 
-      // Publish to blockchain
+      // Publish to blockchain (processTransaction handles cache)
       const ForumManager = require('../utility/ForumManager');
       const txResult = await ForumManager.publishToChain(ForumTags.FORUM_VOTE, voteId, {
         postId: inputs.postId,
@@ -57,27 +53,15 @@ module.exports = {
         createdAt: inputs.createdAt,
       });
 
-      // Upsert vote in cache
+      if (!txResult || !txResult.success) {
+        this.res.status(500);
+        return { success: false, error: txResult?.error || 'Blockchain publish failed' };
+      }
+
+      // Recalculate post score from votes
       const Votes = db.getModel('votes');
       const existingVote = Votes.findOne({ postId: inputs.postId, authorId: userId });
       const oldVoteValue = existingVote ? existingVote.vote : 0;
-
-      if (existingVote) {
-        Votes.update(existingVote.id, {
-          vote: inputs.vote,
-          createdAt: inputs.createdAt,
-        });
-      } else {
-        Votes.create({
-          id: voteId,
-          postId: inputs.postId,
-          authorId: userId,
-          vote: inputs.vote,
-          createdAt: inputs.createdAt,
-        });
-      }
-
-      // Recalculate post score
       const newScore = (post.score || 0) - oldVoteValue + inputs.vote;
       Posts.update(inputs.postId, { score: newScore });
 
