@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Plus, ChevronLeft, ChevronRight, Home } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
+import { useTheme } from '../hooks/useTheme';
 import { useRealtimeUpdate } from '../hooks/useWebSocket';
 import { api } from '../api/endpoints';
 import { useIdentity } from '../hooks/useIdentity';
@@ -13,6 +14,9 @@ export default function Category() {
   const { id } = useParams();
   const { identity } = useIdentity();
   const [page, setPage] = useState(1);
+
+  const { activeThemeId } = useTheme();
+  const isInvisionLayout = activeThemeId?.startsWith('invision');
 
   // Nessun realtimeEntities — gestiamo granularmente
   const { data, loading, error, setData } = useApi(
@@ -145,7 +149,7 @@ export default function Category() {
       </div>
 
       {/* Thread list */}
-      <ThreadList threads={threads} freshThreadIds={freshThreadIds} />
+      <ThreadList threads={threads} freshThreadIds={freshThreadIds} layout={isInvisionLayout ? 'table' : 'cards'} />
 
       {/* Pagination */}
       {totalPages > 1 && (
