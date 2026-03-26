@@ -11,13 +11,13 @@ export default function Modal({ open, onClose, title, children, wide = false }) 
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200]"
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed inset-0 flex items-center justify-center z-[70] p-4"
+            className="fixed inset-0 flex items-center justify-center z-[201] p-4"
           >
             <div
               className={`rounded-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-lg'} border max-h-[90vh] flex flex-col`}
