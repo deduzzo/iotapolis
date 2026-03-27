@@ -1,0 +1,43 @@
+---
+title: Quick Start
+description: Get up and running with IotaPolis in minutes.
+---
+
+## 1. Start the Server
+
+```bash
+npm run dev
+```
+
+The backend starts on `http://localhost:1337` and the frontend dev server on `http://localhost:5173`.
+
+## 2. Open the App
+
+Navigate to `http://localhost:5173` in your browser (or `http://localhost:1337` in production mode).
+
+## 3. Create Your Identity
+
+On the **Identity** page, click **Create New Identity**. The app generates:
+
+- A **BIP39 mnemonic** (24 words) as your master secret
+- An **Ed25519 keypair** derived from the mnemonic
+- An **IOTA address** (your on-chain identity, starting with `0x...`)
+
+Save your mnemonic securely. You can optionally encrypt it with a password (AES-256-GCM) for local storage.
+
+## 4. Get Test Tokens
+
+Click the **Faucet** button in the wallet or visit the wallet page. The faucet sends test IOTA tokens to your address so you can pay gas fees. The faucet has rate limits per address, per IP, and a global cooldown.
+
+## 5. Register On-Chain
+
+Once you have gas tokens, click **Register**. This sends a signed transaction to the IOTA blockchain that registers your address in the Forum shared object. Your identity is now on-chain.
+
+## 6. Create Your First Post
+
+1. Browse to a category or create a new thread
+2. Write your content using the rich text editor
+3. Click **Post** -- the app signs the transaction with your Ed25519 key and submits it directly to the blockchain
+4. The backend indexes the event and the post appears in the forum
+
+All actions are signed by your wallet and verified on-chain by IOTA validators. The server never signs transactions on your behalf.

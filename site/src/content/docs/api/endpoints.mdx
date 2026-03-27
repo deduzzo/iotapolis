@@ -1,0 +1,96 @@
+---
+title: API Endpoints
+description: Complete REST API reference for IotaPolis.
+---
+
+All endpoints are served by the Sails.js backend. Read endpoints return cached data from SQLite. Write endpoints return `410 Gone` -- all writes happen directly on-chain via the IOTA smart contract.
+
+## Forum Data
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/forum-info` | Forum metadata and configuration |
+| `GET` | `/api/v1/config/theme` | Current theme configuration |
+| `GET` | `/api/v1/config/theme/history` | Theme configuration change history |
+| `GET` | `/api/v1/search` | Full-text search across forum content |
+| `GET` | `/api/v1/dashboard` | Dashboard statistics and activity overview |
+| `GET` | `/api/v1/sync-status` | Blockchain sync status |
+| `GET` | `/api/v1/integrity-check` | Cache integrity check vs. blockchain |
+| `GET` | `/api/v1/export-data` | Export forum data |
+
+## Users
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/members` | List all registered users |
+| `GET` | `/api/v1/user/:id` | Get user profile by address |
+| `GET` | `/api/v1/user/:id/history` | User edit history |
+| `GET` | `/api/v1/user/:id/reputation` | User reputation and trade ratings |
+| `GET` | `/api/v1/user/:id/subscription` | User subscription status |
+
+## Threads
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/threads` | List threads (supports filtering and pagination) |
+| `GET` | `/api/v1/thread/:id` | Get thread details with posts |
+| `GET` | `/api/v1/thread/:id/history` | Thread edit history |
+
+## Posts
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/posts` | List posts (supports filtering and pagination) |
+| `GET` | `/api/v1/post/:id/history` | Post edit history |
+| `GET` | `/api/v1/tips/:postId` | Tips received by a specific post |
+
+## Categories
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/categories` | List all categories |
+
+## Marketplace and Escrow
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/marketplace` | List marketplace items |
+| `GET` | `/api/v1/escrows` | List all escrows |
+| `GET` | `/api/v1/escrow/:id` | Get escrow details |
+
+## Wallet
+
+| Method | Path | Description | Auth |
+|--------|------|-------------|------|
+| `POST` | `/api/v1/faucet-request` | Request test tokens for your address | No |
+| `POST` | `/api/v1/deploy-contract` | Deploy smart contract | Admin |
+
+## Admin
+
+These endpoints require admin authentication (Ed25519 signature verification).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/sync-reset` | Reset sync cursor and re-index from blockchain |
+| `POST` | `/api/v1/sync-connect` | Connect to a new forum deployment (connection string) |
+| `POST` | `/api/v1/full-reset` | Full database reset and re-sync |
+
+## Deprecated Endpoints
+
+The following write endpoints return `410 Gone`. All write operations now happen directly on-chain via the IOTA smart contract.
+
+| Method | Path | Original Purpose |
+|--------|------|------------------|
+| `POST` | `/api/v1/register` | User registration |
+| `PUT` | `/api/v1/user/:id` | Edit user profile |
+| `POST` | `/api/v1/categories` | Create category |
+| `PUT` | `/api/v1/categories/:id` | Edit category |
+| `POST` | `/api/v1/threads` | Create thread |
+| `PUT` | `/api/v1/thread/:id` | Edit thread |
+| `POST` | `/api/v1/posts` | Create post |
+| `PUT` | `/api/v1/post/:id` | Edit post |
+| `POST` | `/api/v1/vote` | Cast vote |
+| `POST` | `/api/v1/moderate` | Moderate post |
+| `POST` | `/api/v1/moderate/thread` | Moderate thread |
+| `POST` | `/api/v1/role` | Assign role |
+| `PUT` | `/api/v1/config/theme` | Update theme config |

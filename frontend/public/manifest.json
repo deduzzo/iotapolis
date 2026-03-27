@@ -1,7 +1,7 @@
 {
-  "name": "IOTA Free Forum",
-  "short_name": "IOTAForum",
-  "description": "Decentralized forum on IOTA 2.0 blockchain",
+  "name": "IotaPolis",
+  "short_name": "IotaPolis",
+  "description": "Decentralized community platform on IOTA 2.0 blockchain",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0a1a",

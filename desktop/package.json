@@ -1,17 +1,17 @@
 {
-  "name": "iota-free-forum-desktop",
+  "name": "iotapolis-desktop",
   "version": "0.2.17",
-  "description": "IOTA Free Forum — Decentralized forum on IOTA 2.0 blockchain",
+  "description": "IotaPolis — Decentralized community platform on IOTA 2.0 blockchain",
   "main": "main.js",
   "author": "deduzzo",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/deduzzo/iota-free-forum.git"
+    "url": "https://github.com/deduzzo/iotapolis.git"
   },
   "build": {
     "appId": "org.iotaforum.desktop",
-    "productName": "IOTA Free Forum",
+    "productName": "IotaPolis",
     "directories": {
       "output": "dist"
     },
@@ -91,7 +91,7 @@
     "publish": {
       "provider": "github",
       "owner": "deduzzo",
-      "repo": "iota-free-forum",
+      "repo": "iotapolis",
       "releaseType": "release"
     }
   },

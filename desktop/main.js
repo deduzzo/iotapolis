@@ -10,7 +10,7 @@ const isDev = process.argv.includes('--dev');
 let sailsProcess = null;
 let mainWindow = null;
 
-// User data directory: ~/AppData/iota-free-forum (Win), ~/Library/Application Support/iota-free-forum (Mac), ~/.config/iota-free-forum (Linux)
+// User data directory: ~/AppData/iotapolis (Win), ~/Library/Application Support/iotapolis (Mac), ~/.config/iotapolis (Linux)
 const USER_DATA_DIR = path.join(app.getPath('userData'), 'forum-data');
 const fs = require('fs');
 if (!fs.existsSync(USER_DATA_DIR)) {
@@ -77,14 +77,14 @@ autoUpdater.on('download-progress', (progress) => {
   logToRenderer(`Download: ${pct}%`);
   // Update title bar with progress
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.setTitle(`IOTA Free Forum — Downloading update ${pct}%`);
+    mainWindow.setTitle(`IotaPolis — Downloading update ${pct}%`);
   }
 });
 
 autoUpdater.on('update-downloaded', (info) => {
   console.log('[updater] Update downloaded:', info.version);
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.setTitle('IOTA Free Forum');
+    mainWindow.setTitle('IotaPolis');
   }
   dialog.showMessageBox(mainWindow, {
     type: 'info',
@@ -219,7 +219,7 @@ function createWindow() {
     height: 800,
     minWidth: 800,
     minHeight: 600,
-    title: 'IOTA Free Forum',
+    title: 'IotaPolis',
     icon: path.join(__dirname, 'icons', 'icon.png'),
     webPreferences: {
       nodeIntegration: false,
@@ -249,7 +249,7 @@ function createWindow() {
 function createMenu() {
   const template = [
     {
-      label: 'IOTA Free Forum',
+      label: 'IotaPolis',
       submenu: [
         { label: 'Controlla aggiornamenti', click: () => autoUpdater.checkForUpdates() },
         { type: 'separator' },

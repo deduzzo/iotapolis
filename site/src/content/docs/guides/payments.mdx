@@ -1,0 +1,56 @@
+---
+title: Payments
+description: Tips, subscriptions, and content purchases.
+---
+
+All payments are processed on-chain by the Move smart contract. The server never handles funds.
+
+## Tipping Posts
+
+Any user can tip a post author using the **TipButton** on each post. The flow:
+
+1. Click the tip button and enter an amount
+2. The frontend builds a `tip` transaction
+3. Your wallet signs and submits the transaction
+4. The contract transfers funds to the post author
+5. A `TipEvent` is emitted and indexed by the backend
+
+## Subscriptions
+
+Creators can set up subscription tiers using `configure_tier`. Subscribers pay to access exclusive content.
+
+| Action | Function | Event |
+|--------|----------|-------|
+| Configure a tier | `configure_tier` | -- |
+| Subscribe to a creator | `subscribe` | `SubscriptionEvent` |
+| Renew a subscription | `renew_subscription` | `SubscriptionEvent` |
+
+## Content Purchases
+
+Content can be gated behind a one-time purchase using the `PaywallGate` component.
+
+| Action | Function | Event |
+|--------|----------|-------|
+| Purchase content | `purchase_content` | `PurchaseEvent` |
+
+## Badge Purchases
+
+Creators can configure badges that users can buy to display on their profile.
+
+| Action | Function | Event |
+|--------|----------|-------|
+| Configure a badge | `configure_badge` | -- |
+| Purchase a badge | `purchase_badge` | `BadgeEvent` |
+
+## Treasury and Fees
+
+The Forum smart contract maintains a treasury that collects platform fees:
+
+| Transaction Type | Fee |
+|------------------|-----|
+| Marketplace purchases | 5% |
+| Escrow trades | 2% |
+| Tips | No fee |
+| Subscriptions | No fee |
+
+Admins can withdraw treasury funds using the `withdraw_funds` function, which requires the `AdminCap` capability.

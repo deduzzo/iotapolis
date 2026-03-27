@@ -1,8 +1,8 @@
-# IOTA Free Forum — Project Context
+# IotaPolis — Project Context
 
 ## Overview
 
-Forum decentralizzato su IOTA 2.0 Rebased con smart contract Move.
+Piattaforma community decentralizzata su IOTA 2.0 Rebased con smart contract Move.
 Ogni utente ha il proprio wallet IOTA (Ed25519) e firma transazioni direttamente.
 Il server e solo un indexer/cache — non firma mai per conto degli utenti.
 Include sistema pagamenti completo: tip, abbonamenti, marketplace, escrow multi-sig.

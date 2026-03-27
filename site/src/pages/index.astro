@@ -1,0 +1,16 @@
+---
+import Landing from '../layouts/Landing.astro';
+import Hero from '../components/Hero';
+import Features from '../components/Features';
+import HowItWorks from '../components/HowItWorks';
+import TechStack from '../components/TechStack';
+import Footer from '../components/Footer';
+---
+
+<Landing title="IotaPolis — Decentralized Community Platform" description="Forum, wallet, payments, marketplace, and escrow — all on-chain, powered by IOTA 2.0">
+  <Hero client:load />
+  <Features client:visible />
+  <HowItWorks client:visible />
+  <TechStack client:visible />
+  <Footer client:load />
+</Landing>

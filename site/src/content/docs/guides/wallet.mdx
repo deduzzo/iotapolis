@@ -1,0 +1,44 @@
+---
+title: Wallet
+description: Create and manage your IotaPolis wallet.
+---
+
+## Creating a Wallet
+
+When you create a new identity in IotaPolis, the app generates a **BIP39 mnemonic** -- a sequence of 24 words that serves as your master secret. This happens entirely in your browser; the server never sees your mnemonic.
+
+## Ed25519 Keypair Derivation
+
+From your mnemonic, the app derives:
+
+1. A **private key** (Ed25519) used to sign transactions
+2. A **public key** used to verify your signatures
+3. An **IOTA address** (starting with `0x...`) that serves as your on-chain identity
+
+The derivation uses the IOTA SDK (`@iota/iota-sdk`) and follows the standard IOTA key derivation path.
+
+## Mnemonic Encryption
+
+You can protect your mnemonic with a password. The app encrypts it using **AES-256-GCM** before storing it in the browser's local storage. Each time you open the app, you enter your password to decrypt the mnemonic and unlock your wallet.
+
+## Importing an Existing Mnemonic
+
+If you already have a BIP39 mnemonic (from a previous IotaPolis instance or compatible wallet), you can import it on the Identity page. Enter your 24 words and the app will derive the same keypair and address.
+
+## Getting Test Tokens
+
+The **faucet** provides test IOTA tokens for paying gas fees on testnet. Rate limits apply:
+
+- Per-address cooldown
+- Per-IP rate limiting
+- Global cooldown between requests
+
+Request tokens from the Wallet page or during initial setup.
+
+## Security Best Practices
+
+- **Back up your mnemonic** offline (paper, hardware). If you lose it, your identity is unrecoverable.
+- **Use a strong password** for mnemonic encryption.
+- **Never share your mnemonic** with anyone. The server will never ask for it.
+- **Verify the URL** before entering your mnemonic -- phishing sites can steal your keys.
+- Your mnemonic is **never sent to the server**. All signing happens locally in the browser.

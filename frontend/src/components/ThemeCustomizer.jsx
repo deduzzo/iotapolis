@@ -257,7 +257,7 @@ export default function ThemeCustomizer() {
                 backgroundColor: 'var(--color-surface-hover)',
                 color: 'var(--color-text)',
               }}
-              placeholder="IOTA Free Forum"
+              placeholder="IotaPolis"
             />
           </label>
 

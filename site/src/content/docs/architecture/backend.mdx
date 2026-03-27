@@ -1,0 +1,69 @@
+---
+title: Backend
+description: The Sails.js indexer backend.
+---
+
+## Role: Indexer Only
+
+The backend is a **pure indexer**. It reads events from the IOTA blockchain and caches them in SQLite for fast querying. It does **not** sign transactions or hold user private keys. The only wallet the server holds is for the faucet (dispensing test tokens).
+
+## Key Components
+
+| File | Description |
+|------|-------------|
+| `api/utility/ForumManager.js` | Syncs blockchain events to SQLite, uses `eventAuthor` (verified on-chain) |
+| `api/utility/iota.js` | IOTA SDK wrapper: query events, subscribe to new events |
+| `api/utility/db.js` | SQLite schema definition and model factory |
+| `api/controllers/` | REST API controllers (read-only + faucet) |
+| `config/bootstrap.js` | Server initialization: wallet, sync, polling |
+
+## ForumManager
+
+`ForumManager.processTransaction()` is the core indexing function. When processing events:
+
+- It reads the `eventAuthor` field from the blockchain event, which is verified on-chain by IOTA validators
+- It **ignores** any `data.authorId` from the event payload to prevent impersonation
+- It decompresses gzipped data and stores structured records in SQLite
+
+## SQLite Schema
+
+The database is a **rebuildable cache** -- it can be fully reconstructed by replaying blockchain events.
+
+| Table | Contents |
+|-------|----------|
+| `users` | Registered users with roles and profiles |
+| `threads` | Forum threads with metadata |
+| `posts` | Thread replies and content |
+| `votes` | Upvotes and downvotes |
+| `tips` | Tip records (sender, recipient, amount) |
+| `escrows` | Escrow state (parties, amounts, status) |
+| `reputations` | Trade ratings and reputation scores |
+| `badges` | Badge ownership and configuration |
+
+## REST API
+
+All read endpoints serve cached data from SQLite. Write operations return `410 Gone` -- all writes happen directly on-chain.
+
+See the [API Reference](/api/endpoints) for the full endpoint list.
+
+## Event Tags
+
+The backend processes events based on their tag:
+
+| Tag | Source Function | Min. Role |
+|-----|-----------------|-----------|
+| `FORUM_USER` | `register()` | None |
+| `FORUM_THREAD` | `post_event()` | USER |
+| `FORUM_POST` | `post_event()` | USER |
+| `FORUM_VOTE` | `post_event()` | USER |
+| `FORUM_CATEGORY` | `mod_post_event()` | MODERATOR |
+| `FORUM_MODERATION` | `mod_post_event()` | MODERATOR |
+| `FORUM_ROLE` | `admin_post_event()` | ADMIN |
+| `FORUM_CONFIG` | `admin_post_event()` | ADMIN |
+| `FORUM_TIP` | On-chain event | USER |
+| `FORUM_SUBSCRIPTION` | On-chain event | USER |
+| `FORUM_PURCHASE` | On-chain event | USER |
+| `FORUM_BADGE` | On-chain event | USER |
+| `FORUM_ESCROW_CREATED` | On-chain event | USER |
+| `FORUM_ESCROW_UPDATED` | On-chain event | USER |
+| `FORUM_RATING` | On-chain event | USER |

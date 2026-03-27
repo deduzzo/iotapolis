@@ -1,5 +1,5 @@
 /**
- * Client-side cryptography for IOTA Free Forum.
+ * Client-side cryptography for IotaPolis.
  *
  * Primary identity: IOTA Ed25519 keypair derived from BIP39 mnemonic.
  * Mnemonic encrypted with AES-256-GCM (password-based) for localStorage.

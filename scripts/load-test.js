@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Load Test per IOTA Free Forum
+ * Load Test per IotaPolis
  *
  * Genera post, reply, voti in parallelo per testare il comportamento
  * sotto carico. Usa l'identità dell'utente corrente da localStorage
@@ -169,7 +169,7 @@ function sleep(ms) {
 // ── Main ────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log('IOTA Free Forum — Load Test');
+  console.log('IotaPolis — Load Test');
   console.log(`Config: ${NUM_POSTS} posts, ${REPLIES_PER_POST} replies/post, ${NUM_VOTES} votes, parallel=${PARALLEL}`);
   console.log(`Server: ${BASE_URL}\n`);
 

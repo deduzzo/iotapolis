@@ -1,4 +1,4 @@
-# Deploy Guide — IOTA Free Forum
+# Deploy Guide — IotaPolis
 
 ## Prerequisiti
 
@@ -13,8 +13,8 @@ brew --version
 ## 1. Installazione
 
 ```bash
-git clone <repo-url> iota-free-forum
-cd iota-free-forum
+git clone <repo-url> iotapolis
+cd iotapolis
 npm install
 cd frontend && npm install && cd ..
 ```

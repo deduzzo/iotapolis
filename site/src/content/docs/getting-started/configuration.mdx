@@ -1,0 +1,54 @@
+---
+title: Configuration
+description: Configure your IotaPolis instance.
+---
+
+## Connection String
+
+IotaPolis uses a connection string to identify the blockchain deployment:
+
+```
+network:packageId:forumObjectId
+```
+
+| Segment | Description |
+|---------|-------------|
+| `network` | IOTA network name (e.g. `testnet`, `mainnet`) |
+| `packageId` | Deployed Move package ID (hex address) |
+| `forumObjectId` | The shared Forum object ID (hex address) |
+
+This string is stored in the app settings and shared with users who want to connect to the same forum instance.
+
+## Key Configuration Files
+
+| File | Description |
+|------|-------------|
+| `config/bootstrap.js` | Server initialization: wallet setup (faucet only), sync start, polling interval |
+| `config/routes.js` | All REST API route definitions |
+| `config/private_iota_conf.js` | Private config: server mnemonic (faucet), legacy RSA keys (gitignored) |
+| `frontend/src/api/crypto.js` | Client-side crypto: Ed25519, BIP39, AES-256-GCM, IOTA client setup |
+| `frontend/src/contexts/ThemeContext.jsx` | Theme configuration (7 built-in themes) |
+| `frontend/src/i18n/` | Internationalization files (8 languages) |
+
+## Environment Setup
+
+### Development
+
+Running `npm run dev` starts both servers with hot reload:
+
+- **Backend** (Sails.js): `http://localhost:1337` -- REST API and WebSocket
+- **Frontend** (Vite): `http://localhost:5173` -- proxies API calls to the backend
+
+### Production
+
+Running `npm start` serves the built frontend from `.tmp/public/` through the Sails.js server on port 1337. Build the frontend first with `npm run build`.
+
+Set the environment variable for production:
+
+```bash
+NODE_ENV=production npm start
+```
+
+## Desktop Configuration
+
+The Electron wrapper (`desktop/main.js`) starts the Sails.js backend internally and opens a BrowserWindow. Auto-updates are handled via GitHub Releases using `electron-updater`.

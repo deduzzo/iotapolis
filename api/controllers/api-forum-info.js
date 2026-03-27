@@ -34,7 +34,7 @@ module.exports = {
       }
 
       // Forum name from theme config
-      let forumName = 'IOTA Free Forum';
+      let forumName = 'IotaPolis';
       try {
         const Config = db.getModel('config');
         const themeConfig = Config.findOne({ id: 'CONFIG_theme' });

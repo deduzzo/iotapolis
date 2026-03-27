@@ -1,0 +1,85 @@
+---
+title: Smart Contract
+description: The Move smart contract powering IotaPolis.
+---
+
+The smart contract lives in `move/forum/sources/forum.move` and is the core of the system. All state changes happen on-chain.
+
+## Objects
+
+| Object | Type | Description |
+|--------|------|-------------|
+| **Forum** | Shared | Central registry: users with roles, subscriptions, badges, reputation, treasury |
+| **AdminCap** | Owned | Capability object held by the deployer, required for admin operations |
+| **Escrow** | Shared | Individual escrow instances for 2-of-3 multi-sig trades |
+
+## Roles
+
+Roles are stored on-chain per user in the Forum object:
+
+| Value | Role | Permissions |
+|-------|------|-------------|
+| 0 | BANNED | Cannot interact |
+| 1 | USER | Post, vote, tip, subscribe, purchase, escrow |
+| 2 | MODERATOR | All USER permissions + create categories, moderate content |
+| 3 | ADMIN | All permissions + set roles, configure forum |
+
+## Entry Functions
+
+| Function | Min. Role | Description |
+|----------|-----------|-------------|
+| `register` | None | Register a new user in the Forum |
+| `post_event` | USER | Post a thread, reply, or vote |
+| `mod_post_event` | MODERATOR | Create category, moderate content |
+| `admin_post_event` | ADMIN | Set config, manage roles |
+| `set_user_role` | ADMIN | Change a user's role |
+| `tip` | USER | Send a tip to a post author |
+| `subscribe` | USER | Subscribe to a creator's tier |
+| `renew_subscription` | USER | Renew an existing subscription |
+| `purchase_content` | USER | Purchase gated content |
+| `purchase_badge` | USER | Purchase a badge |
+| `configure_tier` | USER | Configure subscription tiers for your profile |
+| `configure_badge` | USER | Configure badges available for purchase |
+| `create_escrow` | USER | Create a 2-of-3 multi-sig escrow |
+| `mark_delivered` | USER | Seller marks escrow as delivered |
+| `open_dispute` | USER | Open a dispute on an escrow |
+| `vote_release` | USER | Vote to release escrow funds to seller |
+| `vote_refund` | USER | Vote to refund escrow funds to buyer |
+| `rate_trade` | USER | Rate a completed trade |
+| `withdraw_funds` | ADMIN | Withdraw treasury funds |
+
+## Events
+
+The contract emits typed events that the backend indexes:
+
+| Event | Trigger |
+|-------|---------|
+| `ForumEvent` | Any forum operation (data is gzipped) |
+| `TipEvent` | Tip sent to a post author |
+| `SubscriptionEvent` | Subscription created or renewed |
+| `PurchaseEvent` | Content purchased |
+| `BadgeEvent` | Badge purchased |
+| `EscrowCreated` | New escrow created |
+| `EscrowUpdated` | Escrow state changed (delivered, disputed, released, refunded) |
+| `RatingEvent` | Trade rated after completion |
+
+## Data Encoding
+
+All data stored on-chain is encoded as:
+
+```
+JSON -> gzip -> vector<u8>
+```
+
+This minimizes on-chain storage costs while keeping data structured and recoverable.
+
+## Treasury and Fees
+
+The Forum object holds a treasury that collects fees:
+
+| Fee Type | Rate |
+|----------|------|
+| Marketplace purchases | 5% |
+| Escrow trades | 2% |
+
+Overpayments are automatically refunded to the sender by the contract.

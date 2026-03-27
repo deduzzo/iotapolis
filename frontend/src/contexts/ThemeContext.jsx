@@ -98,7 +98,7 @@ export function ThemeProvider({ children }) {
   const [forumThemeId, setForumThemeId] = useState('neon-cyber');
   const [userThemeId, setUserThemeId] = useState(null); // localStorage override
   const [overrides, setOverrides] = useState({});
-  const [forumName, setForumName] = useState('IOTA Free Forum');
+  const [forumName, setForumName] = useState('IotaPolis');
   const [logoBase64, setLogoBase64] = useState(null);
 
   // Active theme: user override > forum default
@@ -187,7 +187,7 @@ export function ThemeProvider({ children }) {
   const resetToDefault = useCallback(() => {
     setActiveThemeId('neon-cyber');
     setOverrides({});
-    setForumName('IOTA Free Forum');
+    setForumName('IotaPolis');
     setLogoBase64(null);
   }, []);
 

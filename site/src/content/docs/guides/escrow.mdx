@@ -1,0 +1,58 @@
+---
+title: Escrow
+description: Multi-signature escrow for secure trades.
+---
+
+IotaPolis includes a **2-of-3 multi-signature escrow** system for secure trades between users.
+
+## Parties
+
+Each escrow involves three parties:
+
+| Party | Role |
+|-------|------|
+| **Buyer** | Pays funds into the escrow |
+| **Seller** | Delivers the goods or service |
+| **Arbitrator** | Resolves disputes (a trusted third party) |
+
+## Workflow
+
+### 1. Create Escrow
+
+The buyer calls `create_escrow`, specifying the seller, arbitrator, amount, and deadline. Funds are locked in a shared Escrow object on-chain.
+
+### 2. Mark Delivered
+
+Once the seller has delivered, they call `mark_delivered` to signal completion.
+
+### 3. Release or Dispute
+
+- **Happy path:** The buyer calls `vote_release` to release funds to the seller. If 2 of 3 parties vote to release, funds are transferred.
+- **Dispute:** Either party calls `open_dispute` to escalate. The arbitrator then votes to release or refund.
+
+### 4. Resolution
+
+| Outcome | Condition |
+|---------|-----------|
+| **Release** | 2 of 3 parties call `vote_release` |
+| **Refund** | 2 of 3 parties call `vote_refund` |
+
+## Cross-Validation
+
+Votes are cross-validated on-chain: a party cannot vote on both sides (release and refund) for the same escrow. This prevents manipulation.
+
+## Rating
+
+After an escrow is completed (released or refunded), both buyer and seller can rate the trade using `rate_trade`. Ratings contribute to the user's on-chain reputation score, visible via the `ReputationBadge` component.
+
+## Deadline Enforcement
+
+Each escrow has a deadline set at creation. The contract enforces this deadline -- if the trade is not completed in time, the appropriate resolution mechanism activates.
+
+## Overpayment Handling
+
+If the buyer sends more than the required amount, the smart contract automatically refunds the excess to the sender. No manual intervention is needed.
+
+## Fees
+
+A **2% fee** is collected by the forum treasury on escrow trades.

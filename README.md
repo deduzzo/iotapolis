@@ -5,10 +5,10 @@
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="MIT" />
 </p>
 
-<h1 align="center">IOTA Free Forum</h1>
+<h1 align="center">IotaPolis</h1>
 
 <p align="center">
-  <strong>A fully decentralized forum with integrated payments, marketplace, and escrow — powered by IOTA 2.0 and Move smart contracts.</strong><br/>
+  <strong>A fully decentralized community platform with integrated payments, marketplace, and escrow — powered by IOTA 2.0 and Move smart contracts.</strong><br/>
   Every post is on-chain. Every user signs with their own wallet. Every payment is trustless.
 </p>
 
@@ -25,9 +25,9 @@
 
 ---
 
-## Why IOTA Free Forum?
+## Why IotaPolis?
 
-Traditional forums depend on a central server that can be shut down, censored, or compromised. **IOTA Free Forum** stores every piece of data on the IOTA 2.0 blockchain as Move smart contract events. The local server is just a cache — the blockchain is the source of truth.
+Traditional forums depend on a central server that can be shut down, censored, or compromised. **IotaPolis** stores every piece of data on the IOTA 2.0 blockchain as Move smart contract events. The local server is just a cache — the blockchain is the source of truth.
 
 - **True decentralization** — Each user has their own IOTA wallet (Ed25519). The server never holds private keys
 - **No single point of failure** — Any node can reconstruct the entire forum from on-chain events
@@ -42,8 +42,8 @@ Traditional forums depend on a central server that can be shut down, censored, o
 
 ```bash
 # Clone
-git clone https://github.com/deduzzo/iota-free-forum.git
-cd iota-free-forum
+git clone https://github.com/deduzzo/iotapolis.git
+cd iotapolis
 
 # Install dependencies
 npm install
@@ -280,7 +280,7 @@ After every escrow resolution, both parties can leave a rating (1-5 stars + comm
 
 ## Multi-Node
 
-IOTA Free Forum supports multiple independent nodes connected to the same smart contract. Each node:
+IotaPolis supports multiple independent nodes connected to the same smart contract. Each node:
 
 1. Runs its own Sails.js server + React frontend
 2. Has its own SQLite cache (reconstructible)
@@ -329,7 +329,7 @@ Available as a standalone desktop application for Windows, macOS, and Linux. The
 
 ### Download
 
-Download the latest release from [GitHub Releases](https://github.com/deduzzo/iota-free-forum/releases):
+Download the latest release from [GitHub Releases](https://github.com/deduzzo/iotapolis/releases):
 
 | Platform | File | Auto-update |
 |----------|------|-------------|

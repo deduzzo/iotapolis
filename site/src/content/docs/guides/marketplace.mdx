@@ -1,0 +1,55 @@
+---
+title: Marketplace
+description: Content, services, and badges marketplace.
+---
+
+The IotaPolis marketplace lets users sell content, offer services, and create purchasable badges -- all settled on-chain.
+
+## Listing Content and Services
+
+Creators can gate content behind a paywall using the `PaywallGate` component. When a user accesses gated content, they are prompted to purchase it via `purchase_content`. The transaction is signed by the buyer and processed on-chain.
+
+Services are offered through the [escrow system](/guides/escrow), which provides multi-sig protection for both buyer and seller.
+
+## Purchasing Items
+
+1. Browse available items on the **Marketplace** page
+2. Click to purchase -- the app builds a transaction
+3. Sign with your wallet
+4. The contract processes the payment and emits a `PurchaseEvent`
+5. Access is granted immediately after the transaction is confirmed
+
+## Badge System
+
+Creators can configure badges that users purchase and display on their profiles:
+
+| Action | Function |
+|--------|----------|
+| Create/configure a badge | `configure_badge` |
+| Purchase a badge | `purchase_badge` |
+
+Badges are stored on-chain and displayed via the `ReputationBadge` and `IdentityBadge` components.
+
+## Subscription Tiers
+
+Creators can set up subscription tiers for recurring access to exclusive content:
+
+| Action | Function |
+|--------|----------|
+| Configure subscription tiers | `configure_tier` |
+| Subscribe | `subscribe` |
+| Renew | `renew_subscription` |
+
+Subscribers gain access to tier-gated content for the duration of their subscription.
+
+## Fee Structure
+
+The forum treasury collects a **5% fee** on all marketplace purchases. This fee is deducted automatically by the smart contract.
+
+| Transaction | Fee |
+|-------------|-----|
+| Content purchases | 5% |
+| Badge purchases | 5% |
+| Escrow trades | 2% |
+| Tips | 0% |
+| Subscriptions | 0% |

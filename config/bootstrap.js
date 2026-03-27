@@ -1,5 +1,5 @@
 /**
- * bootstrap.js — Startup logic for IOTA Free Forum (INDEXER MODE)
+ * bootstrap.js — Startup logic for IotaPolis (INDEXER MODE)
  *
  * The backend is now a pure indexer. It does NOT sign or publish transactions.
  * Users sign TX directly with their own IOTA wallet.
@@ -41,7 +41,7 @@ function ensureConfigFile() {
   const escPub = publicKey.replace(/\n/g, '\\n');
   const escPriv = privateKey.replace(/\n/g, '\\n');
 
-  const content = `// Auto-generated configuration — IOTA Free Forum
+  const content = `// Auto-generated configuration — IotaPolis
 // Generated: ${new Date().toISOString()}
 // DO NOT commit this file (it's in .gitignore)
 
@@ -91,7 +91,7 @@ module.exports.bootstrap = async function (done) {
   // 0. Ensure config file exists
   ensureConfigFile();
 
-  console.log('[bootstrap] Starting IOTA Free Forum bootstrap (INDEXER MODE)...');
+  console.log('[bootstrap] Starting IotaPolis bootstrap (INDEXER MODE)...');
 
   // 1. Initialize SQLite cache (with new payment/marketplace tables)
   try {

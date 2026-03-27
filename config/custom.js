@@ -5,7 +5,7 @@ module.exports.custom = {
   // Porte: configurate in config/private_iota_conf.js (PORT, FRONTEND_PORT)
   baseUrl: `http://localhost:${backendPort}`,
 
-  forumName: 'IOTA Free Forum',
+  forumName: 'IotaPolis',
   postsPerPage: 20,
   threadsPerPage: 20,
   rateLimits: {

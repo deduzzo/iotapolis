@@ -1,0 +1,72 @@
+---
+title: Frontend
+description: The React frontend application.
+---
+
+## Stack
+
+- **React 19** with functional components and hooks
+- **Vite 6** for development and production builds
+- **TailwindCSS 4** with dark mode, neon gradients, and glassmorphism
+- **PWA** support for mobile devices
+
+## Key Hooks
+
+### useIdentity
+
+Manages the user's wallet and identity:
+
+- BIP39 mnemonic generation and import
+- Ed25519 keypair derivation
+- Mnemonic encryption/decryption (AES-256-GCM)
+- Transaction signing and submission to IOTA
+
+### useWallet
+
+Handles all payment operations:
+
+- Sending tips to post authors
+- Subscribing to creators
+- Purchasing content and badges
+- Creating and managing escrows
+- Requesting tokens from the faucet
+
+## Pages
+
+| Page | Description |
+|------|-------------|
+| `Home` | Forum homepage with thread listing |
+| `Thread` | Thread view with posts and replies |
+| `Category` | Category listing and filtering |
+| `NewThread` | Create a new thread |
+| `Identity` | Wallet creation, import, and management |
+| `Settings` | User preferences |
+| `Wallet` | Balance, transaction history, send tokens |
+| `Dashboard` | User activity overview and stats |
+| `Marketplace` | Browse and purchase content, services, badges |
+| `EscrowDashboard` | Manage active escrows |
+| `Subscription` | Manage subscriptions to creators |
+| `Admin` | Admin panel for forum management |
+| `Setup` | Initial forum setup wizard |
+
+## Components
+
+| Component | Description |
+|-----------|-------------|
+| `Layout` | App shell with navigation and theme |
+| `RichEditor` | Rich text editor for posts |
+| `PostCard` | Individual post display with actions |
+| `ThreadList` | Thread listing with sorting and filtering |
+| `TipButton` | Send a tip on any post |
+| `ReputationBadge` | Display user reputation score |
+| `PaywallGate` | Gate content behind a purchase |
+| `EscrowCard` | Escrow details with action buttons |
+| `IdentityBadge` | Display user identity and role |
+
+## Internationalization
+
+The app supports 8 languages using `react-i18next`. Translation files are in `frontend/src/i18n/`.
+
+## Themes
+
+7 built-in themes are available via `ThemeContext.jsx`. Users can switch themes from the Settings page. The default design uses a futuristic dark mode with neon gradients and glassmorphism effects.

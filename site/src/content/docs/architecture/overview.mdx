@@ -1,0 +1,66 @@
+---
+title: Architecture Overview
+description: High-level architecture of IotaPolis.
+---
+
+## Three-Layer Architecture
+
+```
++--------------------------+
+|       Frontend           |
+|  React 19 + Vite + TW4  |
+|  Ed25519 wallet in-app   |
++-----------+--------------+
+            |
+            | REST API (read-only)
+            | WebSocket (real-time)
+            |
++-----------+--------------+
+|    Backend (Indexer)     |
+|    Sails.js + SQLite     |
+|    Cache & search only   |
++-----------+--------------+
+            |
+            | Subscribe events
+            | Poll new events
+            |
++-----------+--------------+
+|    IOTA 2.0 Blockchain   |
+|    Move Smart Contract   |
+|    Validators verify TX  |
++--------------------------+
+```
+
+## Security Model
+
+IotaPolis follows a **direct-signing** architecture:
+
+- **Users own their keys.** Each user holds a BIP39 mnemonic from which an Ed25519 keypair and IOTA address are derived.
+- **Users sign transactions directly.** The frontend constructs and signs transactions using the user's private key, then submits them to IOTA validators.
+- **The server is an indexer only.** It never holds user private keys and never signs transactions on behalf of users.
+- **On-chain verification.** IOTA validators verify `ctx.sender()` at the protocol level, making impersonation impossible.
+- **Backend trusts `eventAuthor`.** When indexing events, `ForumManager` uses the `eventAuthor` field from the blockchain event (verified on-chain), not any author ID from the payload.
+
+## Data Flow
+
+1. User composes an action in the frontend (post, vote, tip, etc.)
+2. The frontend serializes the data as JSON, gzips it, and builds a Move transaction
+3. The user's Ed25519 key signs the transaction
+4. The signed transaction is submitted to IOTA validators
+5. Validators verify the signature and execute the Move function
+6. The smart contract emits an event (e.g. `ForumEvent`, `TipEvent`)
+7. The backend indexes the event into SQLite
+8. The frontend displays the updated data
+
+## Real-Time Sync
+
+IotaPolis uses four complementary sync mechanisms:
+
+| Mechanism | Latency | Description |
+|-----------|---------|-------------|
+| **WebSocket** | Instant | Same-server broadcast of `dataChanged` with entity and action |
+| **IOTA subscribeEvent** | ~2 seconds | Native blockchain event subscription |
+| **Blockchain polling** | 30 seconds | `pollNewEvents()` via incremental cursor |
+| **Auto-repair** | 60 seconds | `repairSync()` compares cache vs. blockchain |
+
+If the WebSocket or subscription fails, polling and auto-repair ensure the cache stays consistent.

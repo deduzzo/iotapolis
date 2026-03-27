@@ -1,0 +1,91 @@
+---
+title: Installation
+description: Install and run IotaPolis from source.
+---
+
+## Prerequisites
+
+- **Node.js** 20+ (engine requirement: >=17.0.0)
+- **npm** (included with Node.js)
+- **IOTA CLI** (installed automatically by the build script, or manually via `brew install iotaledger/tap/iota`)
+
+## Clone and Install
+
+```bash
+git clone https://github.com/deduzzo/iotapolis.git
+cd iotapolis
+npm install
+```
+
+Install frontend dependencies:
+
+```bash
+cd frontend
+npm install
+cd ..
+```
+
+## Smart Contract
+
+Build the Move smart contract:
+
+```bash
+npm run move:build
+```
+
+This command will automatically install the IOTA CLI (if missing), fetch the IOTA Move framework, and compile the contract in `move/forum/`.
+
+Build and deploy to testnet:
+
+```bash
+npm run move:deploy
+```
+
+## Run the Application
+
+### Development Mode
+
+Starts the Sails.js backend and the Vite dev server concurrently (backend on port 1337, frontend on port 5173):
+
+```bash
+npm run dev
+```
+
+### Production Mode
+
+Build the frontend first, then start the server on a single port (1337):
+
+```bash
+npm run build
+npm start
+```
+
+## Desktop Builds (Electron)
+
+Development mode:
+
+```bash
+npm run desktop:dev
+```
+
+Build for the current platform:
+
+```bash
+npm run desktop:build
+```
+
+Platform-specific builds:
+
+```bash
+npm run desktop:build:win    # Windows .exe
+npm run desktop:build:mac    # macOS .dmg
+npm run desktop:build:linux  # Linux .AppImage
+```
+
+## Release
+
+Create a new versioned release (interactive script that bumps version, builds, tags, and creates a GitHub Release):
+
+```bash
+npm run release
+```

@@ -156,7 +156,7 @@ export default function Setup() {
           className="text-4xl font-bold neon-text mb-3"
           style={{ fontFamily: 'var(--font-heading)' }}
         >
-          IOTA Free Forum
+          IotaPolis
         </h1>
         <p className="text-lg" style={{ color: 'var(--color-text-muted)' }}>
           Forum decentralizzato su IOTA 2.0 — zero fee, post firmati, immutabili
