@@ -22,33 +22,33 @@ export default defineConfig({
         {
           label: 'Getting Started',
           items: [
-            { label: 'Installation', slug: 'getting-started/installation' },
-            { label: 'Quick Start', slug: 'getting-started/quick-start' },
-            { label: 'Configuration', slug: 'getting-started/configuration' },
+            { label: 'Installation', slug: 'docs/getting-started/installation' },
+            { label: 'Quick Start', slug: 'docs/getting-started/quick-start' },
+            { label: 'Configuration', slug: 'docs/getting-started/configuration' },
           ],
         },
         {
           label: 'Architecture',
           items: [
-            { label: 'Overview', slug: 'architecture/overview' },
-            { label: 'Smart Contract', slug: 'architecture/smart-contract' },
-            { label: 'Backend', slug: 'architecture/backend' },
-            { label: 'Frontend', slug: 'architecture/frontend' },
+            { label: 'Overview', slug: 'docs/architecture/overview' },
+            { label: 'Smart Contract', slug: 'docs/architecture/smart-contract' },
+            { label: 'Backend', slug: 'docs/architecture/backend' },
+            { label: 'Frontend', slug: 'docs/architecture/frontend' },
           ],
         },
         {
           label: 'Guides',
           items: [
-            { label: 'Wallet', slug: 'guides/wallet' },
-            { label: 'Payments & Tips', slug: 'guides/payments' },
-            { label: 'Escrow', slug: 'guides/escrow' },
-            { label: 'Marketplace', slug: 'guides/marketplace' },
+            { label: 'Wallet', slug: 'docs/guides/wallet' },
+            { label: 'Payments & Tips', slug: 'docs/guides/payments' },
+            { label: 'Escrow', slug: 'docs/guides/escrow' },
+            { label: 'Marketplace', slug: 'docs/guides/marketplace' },
           ],
         },
         {
           label: 'API Reference',
           items: [
-            { label: 'REST Endpoints', slug: 'api/endpoints' },
+            { label: 'REST Endpoints', slug: 'docs/api/endpoints' },
           ],
         },
       ],

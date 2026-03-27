@@ -1,5 +1,6 @@
 ---
 import Landing from '../layouts/Landing.astro';
+import BlockchainBg from '../components/BlockchainBg';
 import Hero from '../components/Hero';
 import Features from '../components/Features';
 import HowItWorks from '../components/HowItWorks';
@@ -8,6 +9,7 @@ import Footer from '../components/Footer';
 ---
 
 <Landing title="IotaPolis — Decentralized Community Platform" description="Forum, wallet, payments, marketplace, and escrow — all on-chain, powered by IOTA 2.0">
+  <BlockchainBg client:load />
   <Hero client:load />
   <Features client:visible />
   <HowItWorks client:visible />
