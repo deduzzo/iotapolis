@@ -144,4 +144,62 @@ npm run desktop:build:linux  # Build Linux .AppImage
 
 # Release
 npm run release          # Script interattivo: version bump -> build -> tag -> GitHub Release
+
+# Sito / Documentazione
+cd site && npm run dev       # Dev server locale (localhost:4321)
+cd site && npm run build     # Build statico -> site/dist/
+cd site && npm run preview   # Preview build locale
 ```
+
+## Sito Web & Documentazione (site/)
+
+### Dominio e Hosting
+- **URL**: https://iotapolis.io
+- **Hosting**: GitHub Pages (deploy automatico via GitHub Actions)
+- **CNAME**: `site/public/CNAME` contiene `iotapolis.io`
+- **DNS**: 4 record A che puntano ai server GitHub Pages (185.199.108-111.153)
+- **SSL**: Certificato Let's Encrypt automatico via GitHub Pages
+- **Workflow**: `.github/workflows/deploy-site.yml` — trigger su push a `main` (path `site/**`)
+
+### Tech Stack Sito
+- **Astro 5** — framework statico, build ultra-veloce
+- **Starlight** (plugin Astro) — tema documentazione con sidebar, search, dark mode
+- **React 19** — componenti landing page (Hero, Features, HowItWorks, TechStack, Footer)
+- **TailwindCSS 4** — via `@tailwindcss/vite` plugin
+- **Content Collections** — docs in `.mdx` con `docsLoader()` + `docsSchema()` (Starlight 0.32+)
+
+### Struttura
+```
+site/
+├── astro.config.mjs          # Config: site URL, base path, Starlight sidebar, integrations
+├── src/content.config.ts     # Content collection con docsLoader() (richiesto da Starlight 0.32)
+├── src/pages/index.astro     # Landing page (usa Layout custom, non Starlight)
+├── src/layouts/Landing.astro # Layout landing: importa global.css, IntersectionObserver
+├── src/components/*.tsx      # React: Hero, Features, HowItWorks, TechStack, Footer
+├── src/styles/global.css     # TailwindCSS + Starlight dark theme vars + animazioni
+├── src/content/docs/         # Documentazione MDX (Starlight)
+│   ├── getting-started/      # installation, quick-start, configuration
+│   ├── architecture/         # overview, smart-contract, backend, frontend
+│   ├── guides/               # wallet, payments, escrow, marketplace
+│   └── api/                  # endpoints
+├── public/CNAME              # Custom domain per GitHub Pages
+└── public/favicon.svg        # Favicon gradient "iP"
+```
+
+### Come Aggiornare
+- **Documentazione**: modifica i file `.mdx` in `site/src/content/docs/`, push su main
+- **Landing page**: modifica i componenti React in `site/src/components/`
+- **Stili**: `site/src/styles/global.css` (TailwindCSS + animazioni custom)
+- **Sidebar docs**: modifica `sidebar` in `site/astro.config.mjs`
+- **Deploy**: automatico su push a main (path `site/**`)
+
+### Note Importanti
+- La landing page usa un layout custom (`Landing.astro`), NON il tema Starlight
+- `Landing.astro` deve importare `../styles/global.css` per TailwindCSS
+- Le docs usano Starlight con `customCss: ['./src/styles/global.css']`
+- `image.service: noop` in astro.config per evitare dipendenza da `sharp`
+- `@astrojs/sitemap` override a 3.2.1 per compatibilita Zod 3.x vs 4.x
+
+### README Multilingua
+8 versioni del README: `README.md` (EN), `.it.md`, `.es.md`, `.fr.md`, `.de.md`, `.pt.md`, `.zh.md`, `.ja.md`
+Ogni file ha il language selector in cima con link a tutte le versioni.
