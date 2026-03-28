@@ -12,7 +12,7 @@ module.exports = {
 
   fn: async function () {
     try {
-      const categories = db.getCategoryStats();
+          const categories = db.getCategoryStats();
       return { success: true, categories };
     } catch (err) {
       sails.log.error('[api-categories]', err.message || err);
